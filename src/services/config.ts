@@ -1,5 +1,5 @@
 export interface AppConfig {
-  provider: 'openai' | 'anthropic' | 'openai-compatible';
+  provider: 'openai' | 'anthropic' | 'openai-compatible' | 'lmstudio';
   model: string;
   apiKey: string;
   baseUrl: string;
@@ -20,6 +20,11 @@ const PROVIDER_DEFAULTS: Record<string, Omit<AppConfig, 'apiKey'>> = {
     provider: 'openai-compatible',
     model: '',
     baseUrl: '',
+  },
+  lmstudio: {
+    provider: 'lmstudio',
+    model: '',
+    baseUrl: 'http://localhost:1234',
   },
 };
 
@@ -71,7 +76,7 @@ export async function loadConfig(): Promise<AppConfig | null> {
     // File-based config unavailable
   }
 
-  return null;
+  return getDefaultConfig('openai');
 }
 
 export async function saveConfig(config: AppConfig): Promise<void> {
@@ -81,6 +86,10 @@ export async function saveConfig(config: AppConfig): Promise<void> {
 
 export function isConfigured(config: AppConfig | null): boolean {
   if (!config) return false;
+
+  if (config.provider === 'lmstudio') {
+    return !!(config.provider && config.model);
+  }
 
   return !!(config.provider && config.model && config.apiKey);
 }

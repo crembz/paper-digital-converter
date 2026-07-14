@@ -14,6 +14,11 @@ export interface ElectronAPI {
   saveFileDialog(defaultPath?: string): Promise<string | null>;
   readFile(path: string, asBase64?: boolean): Promise<string>;
   writeFile(path: string, content: string): Promise<void>;
+  minimizeWindow(): Promise<void>;
+  maximizeWindow(): Promise<void>;
+  closeWindow(): Promise<void>;
+  isMaximized(): Promise<boolean>;
+  onWindowStateChanged(callback: (data: { maximized: boolean }) => void): () => void;
 }
 
 const electronAPI: ElectronAPI = {
@@ -39,6 +44,32 @@ const electronAPI: ElectronAPI = {
 
   writeFile: async (filePath: string, content: string): Promise<void> => {
     return ipcRenderer.invoke('write-file', filePath, content);
+  },
+
+  minimizeWindow: async (): Promise<void> => {
+    return ipcRenderer.invoke('window-minimize');
+  },
+
+  maximizeWindow: async (): Promise<void> => {
+    return ipcRenderer.invoke('window-maximize');
+  },
+
+  closeWindow: async (): Promise<void> => {
+    return ipcRenderer.invoke('window-close');
+  },
+
+  isMaximized: async (): Promise<boolean> => {
+    return ipcRenderer.invoke('window-is-maximized');
+  },
+
+  onWindowStateChanged: (callback: (data: { maximized: boolean }) => void): () => void => {
+    const listener = (_event: Electron.IpcRendererEvent, data: { maximized: boolean }) => {
+      callback(data);
+    };
+    ipcRenderer.on('window-state-changed', listener);
+    return () => {
+      ipcRenderer.removeListener('window-state-changed', listener);
+    };
   },
 };
 

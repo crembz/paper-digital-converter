@@ -108,7 +108,7 @@ export async function convertImageToMarkdown(
   onChunk: (text: string) => void,
   signal: AbortSignal,
 ): Promise<string> {
-  if (!config.apiKey) {
+  if (!config.apiKey && config.provider !== 'lmstudio') {
     throw new Error('API key is not configured. Please set your LLM API key in the config panel.');
   }
 
@@ -123,20 +123,21 @@ export async function convertImageToMarkdown(
   signal.throwIfAborted();
 
   if (config.provider === 'anthropic') {
-    const client = new Anthropic({
+    const anthropicOpts: Record<string, unknown> = {
       apiKey: config.apiKey,
       dangerouslyAllowBrowser: true,
-    });
+    };
+    const client = new Anthropic(anthropicOpts as never);
 
     return convertWithAnthropic(client, config.model, imageBase64, onChunk, signal);
   }
 
   const openAIOpts: ConstructorParameters<typeof OpenAI>[0] = {
-    apiKey: config.apiKey,
+    apiKey: config.apiKey || '',
     dangerouslyAllowBrowser: true,
   };
 
-  if (config.provider === 'openai-compatible' && config.baseUrl) {
+  if ((config.provider === 'openai-compatible' || config.provider === 'lmstudio') && config.baseUrl) {
     openAIOpts.baseURL = config.baseUrl;
   }
 

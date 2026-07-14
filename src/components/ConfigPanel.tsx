@@ -11,6 +11,7 @@ const PROVIDER_OPTIONS: AppConfig['provider'][] = [
   'openai',
   'anthropic',
   'openai-compatible',
+  'lmstudio',
 ];
 
 export default function ConfigPanel({ config, onSave, onClose }: ConfigPanelProps) {
@@ -54,9 +55,9 @@ export default function ConfigPanel({ config, onSave, onClose }: ConfigPanelProp
 
     if (!provider) next.provider = 'Provider is required';
     if (!model.trim()) next.model = 'Model is required';
-    if (!apiKey.trim()) next.apiKey = 'API key is required';
-    if (provider === 'openai-compatible' && !baseUrl.trim()) {
-      next.baseUrl = 'Base URL is required for openai-compatible';
+    if (provider !== 'lmstudio' && !apiKey.trim()) next.apiKey = 'API key is required';
+    if ((provider === 'openai-compatible' || provider === 'lmstudio') && !baseUrl.trim()) {
+      next.baseUrl = 'Base URL is required';
     }
 
     setErrors(next);
@@ -123,6 +124,7 @@ export default function ConfigPanel({ config, onSave, onClose }: ConfigPanelProp
                 if (errors.apiKey) setErrors((prev) => ({ ...prev, apiKey: '' }));
               }}
               placeholder="sk-..."
+              disabled={provider === 'lmstudio'}
               aria-invalid={!!errors.apiKey}
             />
             <button
@@ -134,6 +136,7 @@ export default function ConfigPanel({ config, onSave, onClose }: ConfigPanelProp
               {showApiKey ? 'Hide' : 'Show'}
             </button>
           </div>
+          {provider === 'lmstudio' && <span className="form-hint">Not required for LM Studio</span>}
           {errors.apiKey && <span className="error">{errors.apiKey}</span>}
         </div>
 
@@ -249,6 +252,11 @@ const styles = `
   .error {
     font-size: 0.75rem;
     color: #f38ba8;
+  }
+
+  .form-hint {
+    font-size: 0.75rem;
+    color: #a6adc8;
   }
 
   .password-input {

@@ -25,6 +25,14 @@ function createWindow(): void {
     },
   });
 
+  mainWindow.on('maximize', () => {
+    mainWindow?.webContents.send('window-state-changed', { maximized: true });
+  });
+
+  mainWindow.on('unmaximize', () => {
+    mainWindow?.webContents.send('window-state-changed', { maximized: false });
+  });
+
   if (isDev) {
     mainWindow.loadURL('http://localhost:5173');
     mainWindow.webContents.openDevTools();
@@ -116,4 +124,24 @@ ipcMain.handle('write-file', async (_event, filePath: string, content: string): 
   } catch (error) {
     throw new Error(`Failed to write file: ${(error as Error).message}`);
   }
+});
+
+ipcMain.handle('window-minimize', (): void => {
+  mainWindow?.minimize();
+});
+
+ipcMain.handle('window-maximize', (): void => {
+  if (mainWindow?.isMaximized()) {
+    mainWindow?.unmaximize();
+  } else {
+    mainWindow?.maximize();
+  }
+});
+
+ipcMain.handle('window-close', (): void => {
+  mainWindow?.close();
+});
+
+ipcMain.handle('window-is-maximized', (): boolean => {
+  return mainWindow?.isMaximized() ?? false;
 });

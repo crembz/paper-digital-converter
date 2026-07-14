@@ -3,6 +3,9 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 interface ImagePreviewProps {
   image: string;
   onReplace: () => void;
+  totalPages?: number;
+  currentPage?: number;
+  onPageChange?: (page: number) => void;
 }
 
 function extractFilenameFromDataUri(dataUri: string): string | null {
@@ -39,10 +42,11 @@ function extractDimensions(img: HTMLImageElement): { width: number; height: numb
   };
 }
 
-export default function ImagePreview({ image, onReplace }: ImagePreviewProps) {
+export default function ImagePreview({ image, onReplace, totalPages, currentPage, onPageChange }: ImagePreviewProps) {
   const [scale, setScale] = useState<number>(1);
   const [dimensions, setDimensions] = useState<{ width: number; height: number } | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const isMultiPage = totalPages && totalPages > 1;
 
   const filename = extractFilenameFromDataUri(image);
 
@@ -67,6 +71,18 @@ export default function ImagePreview({ image, onReplace }: ImagePreviewProps) {
     setScale(1);
   }, []);
 
+  const handlePrevPage = useCallback(() => {
+    if (onPageChange && currentPage && currentPage > 0) {
+      onPageChange(currentPage - 1);
+    }
+  }, [onPageChange, currentPage]);
+
+  const handleNextPage = useCallback(() => {
+    if (onPageChange && currentPage && totalPages && currentPage < totalPages - 1) {
+      onPageChange(currentPage + 1);
+    }
+  }, [onPageChange, currentPage, totalPages]);
+
   useEffect(() => {
     setScale(1);
     setDimensions(null);
@@ -81,7 +97,22 @@ export default function ImagePreview({ image, onReplace }: ImagePreviewProps) {
             {dimensions.width} &times; {dimensions.height}
           </span>
         )}
+        {isMultiPage && (
+          <span className="image-preview__pagenum">
+            Page {currentPage! + 1} / {totalPages}
+          </span>
+        )}
         <span className="image-preview__zoom">{Math.round(scale * 100)}%</span>
+        {isMultiPage && (
+          <>
+            <button type="button" className="btn-secondary" onClick={handlePrevPage} disabled={!currentPage}>
+              Prev
+            </button>
+            <button type="button" className="btn-secondary" onClick={handleNextPage} disabled={currentPage !== undefined && currentPage >= (totalPages! - 1)}>
+              Next
+            </button>
+          </>
+        )}
         <button type="button" className="btn-secondary" onClick={handleResetZoom}>
           Reset Zoom
         </button>

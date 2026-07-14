@@ -47,6 +47,43 @@ body {
   padding: 0.75rem 1rem;
   background-color: #16213e;
   border-bottom: 1px solid #2a2a4a;
+  -webkit-app-region: drag;
+}
+
+.top-bar__controls {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  -webkit-app-region: no-drag;
+}
+
+.window-controls {
+  display: flex;
+  align-items: center;
+}
+
+.window-controls__btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  height: 36px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  color: #cdd6f4;
+  cursor: pointer;
+  transition: background-color 0.15s;
+}
+
+.window-controls__btn:hover {
+  background-color: rgba(205, 214, 244, 0.1);
+}
+
+.window-controls__btn--close:hover {
+  background-color: #f38ba8;
+  color: #1e1e2e;
 }
 
 .top-bar h1 {

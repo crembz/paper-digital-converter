@@ -5,6 +5,11 @@ interface ElectronAPI {
   saveFileDialog(defaultPath?: string): Promise<string | null>;
   readFile(path: string, asBase64?: boolean): Promise<string>;
   writeFile(path: string, content: string): Promise<void>;
+  minimizeWindow(): Promise<void>;
+  maximizeWindow(): Promise<void>;
+  closeWindow(): Promise<void>;
+  isMaximized(): Promise<boolean>;
+  onWindowStateChanged(callback: (data: { maximized: boolean }) => void): () => void;
 }
 
 interface Window {

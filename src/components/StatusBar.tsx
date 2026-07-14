@@ -9,6 +9,7 @@ interface StatusBarProps {
   hasImage: boolean;
   hasConfig: boolean;
   hasMarkdown: boolean;
+  convertingPage: { current: number; total: number } | null;
 }
 
 function Spinner(): React.ReactElement {
@@ -47,6 +48,7 @@ export default function StatusBar({
   hasImage,
   hasConfig,
   hasMarkdown,
+  convertingPage,
 }: StatusBarProps): React.ReactElement {
   const convertDisabled = !hasImage || !hasConfig || isProcessing;
   const saveDisabled = !hasMarkdown || isProcessing;
@@ -57,6 +59,11 @@ export default function StatusBar({
   if (error) {
     statusText = error;
     statusClass = 'status-error';
+  } else if (isProcessing && convertingPage) {
+    statusText = convertingPage.total > 1
+      ? `Converting page ${convertingPage.current} of ${convertingPage.total}...`
+      : 'Converting...';
+    statusClass = 'status-processing';
   } else if (isProcessing) {
     statusText = 'Converting...';
     statusClass = 'status-processing';
@@ -64,7 +71,7 @@ export default function StatusBar({
     statusText = 'Configure your LLM provider to begin';
     statusClass = '';
   } else if (!hasImage) {
-    statusText = 'Ready — upload an image to convert';
+    statusText = 'Ready — upload an image or PDF to convert';
     statusClass = '';
   } else {
     statusText = 'Ready to convert';

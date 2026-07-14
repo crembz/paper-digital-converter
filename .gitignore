@@ -6,3 +6,4 @@ dist-electron/
 Thumbs.db
 .env
 config.json
+temp.zip
