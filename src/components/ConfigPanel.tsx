@@ -1,0 +1,316 @@
+import React, { useState, useEffect, useCallback } from 'react';
+import { AppConfig, getDefaultConfig } from '../services/config';
+
+type ConfigPanelProps = {
+  config: AppConfig | null;
+  onSave: (config: AppConfig) => void;
+  onClose: () => void;
+};
+
+const PROVIDER_OPTIONS: AppConfig['provider'][] = [
+  'openai',
+  'anthropic',
+  'openai-compatible',
+];
+
+export default function ConfigPanel({ config, onSave, onClose }: ConfigPanelProps) {
+  const [provider, setProvider] = useState<AppConfig['provider']>('openai');
+  const [model, setModel] = useState('');
+  const [apiKey, setApiKey] = useState('');
+  const [baseUrl, setBaseUrl] = useState('');
+  const [showApiKey, setShowApiKey] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  const syncDefaults = useCallback(
+    (prov: AppConfig['provider']) => {
+      const defaults = getDefaultConfig(prov);
+      setModel(defaults.model);
+      setBaseUrl(defaults.baseUrl);
+    },
+    [],
+  );
+
+  useEffect(() => {
+    if (config) {
+      setProvider(config.provider);
+      setModel(config.model);
+      setApiKey(config.apiKey);
+      setBaseUrl(config.baseUrl);
+    } else {
+      syncDefaults('openai');
+    }
+    setErrors({});
+  }, [config, syncDefaults]);
+
+  const handleProviderChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const next = e.target.value as AppConfig['provider'];
+    setProvider(next);
+    syncDefaults(next);
+    setErrors({});
+  };
+
+  const validate = (): boolean => {
+    const next: Record<string, string> = {};
+
+    if (!provider) next.provider = 'Provider is required';
+    if (!model.trim()) next.model = 'Model is required';
+    if (!apiKey.trim()) next.apiKey = 'API key is required';
+    if (provider === 'openai-compatible' && !baseUrl.trim()) {
+      next.baseUrl = 'Base URL is required for openai-compatible';
+    }
+
+    setErrors(next);
+    return Object.keys(next).length === 0;
+  };
+
+  const handleSave = () => {
+    if (!validate()) return;
+    onSave({ provider, model, apiKey, baseUrl });
+  };
+
+  const handleClose = () => {
+    setErrors({});
+    onClose();
+  };
+
+  return (
+    <div className="config-overlay" onClick={handleClose}>
+      <div className="config-panel" onClick={(e) => e.stopPropagation()}>
+        <h2>LLM Configuration</h2>
+
+        <div className="form-group">
+          <label htmlFor="provider">Provider</label>
+          <select
+            id="provider"
+            value={provider}
+            onChange={handleProviderChange}
+            aria-invalid={!!errors.provider}
+          >
+            {PROVIDER_OPTIONS.map((opt) => (
+              <option key={opt} value={opt}>
+                {opt}
+              </option>
+            ))}
+          </select>
+          {errors.provider && <span className="error">{errors.provider}</span>}
+        </div>
+
+        <div className="form-group">
+          <label htmlFor="model">Model</label>
+          <input
+            id="model"
+            type="text"
+            value={model}
+            onChange={(e) => {
+              setModel(e.target.value);
+              if (errors.model) setErrors((prev) => ({ ...prev, model: '' }));
+            }}
+            placeholder="e.g. gpt-4o"
+            aria-invalid={!!errors.model}
+          />
+          {errors.model && <span className="error">{errors.model}</span>}
+        </div>
+
+        <div className="form-group">
+          <label htmlFor="apiKey">API Key</label>
+          <div className="password-input">
+            <input
+              id="apiKey"
+              type={showApiKey ? 'text' : 'password'}
+              value={apiKey}
+              onChange={(e) => {
+                setApiKey(e.target.value);
+                if (errors.apiKey) setErrors((prev) => ({ ...prev, apiKey: '' }));
+              }}
+              placeholder="sk-..."
+              aria-invalid={!!errors.apiKey}
+            />
+            <button
+              type="button"
+              className="toggle-visibility"
+              onClick={() => setShowApiKey((v) => !v)}
+              aria-label={showApiKey ? 'Hide API key' : 'Show API key'}
+            >
+              {showApiKey ? 'Hide' : 'Show'}
+            </button>
+          </div>
+          {errors.apiKey && <span className="error">{errors.apiKey}</span>}
+        </div>
+
+        <div className="form-group">
+          <label htmlFor="baseUrl">
+            Base URL
+            {provider === 'openai-compatible' && (
+              <span className="required-badge">Required</span>
+            )}
+          </label>
+          <input
+            id="baseUrl"
+            type="url"
+            value={baseUrl}
+            onChange={(e) => {
+              setBaseUrl(e.target.value);
+              if (errors.baseUrl) setErrors((prev) => ({ ...prev, baseUrl: '' }));
+            }}
+            placeholder="https://api.openai.com"
+            aria-invalid={!!errors.baseUrl}
+          />
+          {errors.baseUrl && <span className="error">{errors.baseUrl}</span>}
+        </div>
+
+        <div className="config-actions">
+          <button type="button" className="btn-cancel" onClick={handleClose}>
+            Cancel
+          </button>
+          <button type="button" className="btn-save" onClick={handleSave}>
+            Save
+          </button>
+        </div>
+      </div>
+
+      <style>{styles}</style>
+    </div>
+  );
+}
+
+const styles = `
+  .config-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.65);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+  }
+
+  .config-panel {
+    background: #1e1e2e;
+    color: #cdd6f4;
+    border-radius: 12px;
+    padding: 32px;
+    width: 420px;
+    max-width: 90vw;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  }
+
+  .config-panel h2 {
+    margin: 0 0 24px;
+    font-size: 1.25rem;
+    color: #cdd6f4;
+  }
+
+  .form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 16px;
+  }
+
+  .form-group label {
+    font-size: 0.85rem;
+    color: #a6adc8;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .required-badge {
+    font-size: 0.7rem;
+    background: #f38ba8;
+    color: #1e1e2e;
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-weight: 600;
+  }
+
+  .form-group select,
+  .form-group input {
+    background: #313244;
+    border: 1px solid #45475a;
+    border-radius: 6px;
+    color: #cdd6f4;
+    padding: 8px 12px;
+    font-size: 0.9rem;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+
+  .form-group select:focus,
+  .form-group input:focus {
+    border-color: #89b4fa;
+  }
+
+  .form-group input[aria-invalid='true'],
+  .form-group select[aria-invalid='true'] {
+    border-color: #f38ba8;
+  }
+
+  .error {
+    font-size: 0.75rem;
+    color: #f38ba8;
+  }
+
+  .password-input {
+    display: flex;
+    gap: 8px;
+  }
+
+  .password-input input {
+    flex: 1;
+  }
+
+  .toggle-visibility {
+    background: #313244;
+    border: 1px solid #45475a;
+    border-radius: 6px;
+    color: #a6adc8;
+    padding: 0 12px;
+    font-size: 0.8rem;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.15s;
+  }
+
+  .toggle-visibility:hover {
+    background: #45475a;
+  }
+
+  .config-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    margin-top: 24px;
+  }
+
+  .btn-cancel {
+    background: transparent;
+    border: 1px solid #45475a;
+    color: #a6adc8;
+    padding: 8px 20px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: background 0.15s;
+  }
+
+  .btn-cancel:hover {
+    background: #313244;
+  }
+
+  .btn-save {
+    background: #89b4fa;
+    border: none;
+    color: #1e1e2e;
+    padding: 8px 20px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    font-weight: 600;
+    transition: opacity 0.15s;
+  }
+
+  .btn-save:hover {
+    opacity: 0.85;
+  }
+`;
