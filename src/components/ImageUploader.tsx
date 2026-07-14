@@ -6,6 +6,7 @@ interface ImageUploaderProps {
   onImageSelect: (dataUri: string) => void;
   onPdfSelect: (pages: string[], filename: string) => void;
   onLoadingState: (loading: boolean) => void;
+  onError?: (message: string) => void;
 }
 
 const ACCEPTED_TYPES: Record<string, string[]> = {
@@ -32,13 +33,16 @@ function readFileAsDataUri(file: File): Promise<string> {
   });
 }
 
-export default function ImageUploader({ onImageSelect, onPdfSelect, onLoadingState }: ImageUploaderProps) {
+export default function ImageUploader({ onImageSelect, onPdfSelect, onLoadingState, onError }: ImageUploaderProps) {
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const onDrop = useCallback(
     async (acceptedFiles: File[]) => {
       const file = acceptedFiles[0];
       if (!file) return;
+
+      setError(null);
 
       try {
         if (file.type === 'application/pdf') {
@@ -50,14 +54,16 @@ export default function ImageUploader({ onImageSelect, onPdfSelect, onLoadingSta
           const dataUri = await readFileAsDataUri(file);
           onImageSelect(dataUri);
         }
-      } catch {
-        // Silently ignore read errors; user can retry
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : 'Failed to process file';
+        setError(message);
+        onError?.(message);
       } finally {
         setIsLoading(false);
         onLoadingState(false);
       }
     },
-    [onImageSelect, onPdfSelect, onLoadingState],
+    [onImageSelect, onPdfSelect, onLoadingState, onError],
   );
 
   const dropzoneOptions: DropzoneOptions = {
@@ -80,6 +86,8 @@ export default function ImageUploader({ onImageSelect, onPdfSelect, onLoadingSta
         <div className="dropzone__content">
           {isLoading ? (
             <p className="dropzone__text">Rendering PDF pages...</p>
+          ) : error ? (
+            <p className="dropzone__text dropzone__text--error">{error}</p>
           ) : (
             <>
               <svg
@@ -116,6 +124,7 @@ export default function ImageUploader({ onImageSelect, onPdfSelect, onLoadingSta
         className="btn-secondary"
         disabled={isLoading}
         onClick={() => {
+          setError(null);
           const input = document.querySelector('.dropzone input[type="file"]');
           if (input instanceof HTMLInputElement) {
             input.click();

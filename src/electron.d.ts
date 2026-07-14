@@ -1,6 +1,6 @@
 interface ElectronAPI {
-  loadConfig(): Promise<{ provider: string; model: string; apiKey: string; baseUrl: string } | null>;
-  saveConfig(config: { provider: string; model: string; apiKey: string; baseUrl: string }): Promise<void>;
+  loadConfig(): Promise<{ provider: string; model: string; apiKey: string; baseUrl: string; useApiKey: boolean } | null>;
+  saveConfig(config: { provider: string; model: string; apiKey: string; baseUrl: string; useApiKey: boolean }): Promise<void>;
   openFileDialog(filters?: string[][]): Promise<string[] | null>;
   saveFileDialog(defaultPath?: string): Promise<string | null>;
   readFile(path: string, asBase64?: boolean): Promise<string>;

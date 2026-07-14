@@ -267,6 +267,10 @@ button:disabled {
   text-align: center;
 }
 
+.dropzone__text--error {
+  color: #f38ba8;
+}
+
 .dropzone__hint {
   color: #888;
   font-size: 0.8rem;

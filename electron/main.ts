@@ -9,6 +9,7 @@ interface Config {
   model: string;
   apiKey: string;
   baseUrl: string;
+  useApiKey: boolean;
 }
 
 let mainWindow: BrowserWindow | null = null;

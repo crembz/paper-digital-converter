@@ -19,6 +19,7 @@ export default function ConfigPanel({ config, onSave, onClose }: ConfigPanelProp
   const [model, setModel] = useState('');
   const [apiKey, setApiKey] = useState('');
   const [baseUrl, setBaseUrl] = useState('');
+  const [useApiKey, setUseApiKey] = useState(true);
   const [showApiKey, setShowApiKey] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -27,6 +28,7 @@ export default function ConfigPanel({ config, onSave, onClose }: ConfigPanelProp
       const defaults = getDefaultConfig(prov);
       setModel(defaults.model);
       setBaseUrl(defaults.baseUrl);
+      setUseApiKey(defaults.useApiKey);
     },
     [],
   );
@@ -37,6 +39,7 @@ export default function ConfigPanel({ config, onSave, onClose }: ConfigPanelProp
       setModel(config.model);
       setApiKey(config.apiKey);
       setBaseUrl(config.baseUrl);
+      setUseApiKey(config.useApiKey);
     } else {
       syncDefaults('openai');
     }
@@ -55,7 +58,7 @@ export default function ConfigPanel({ config, onSave, onClose }: ConfigPanelProp
 
     if (!provider) next.provider = 'Provider is required';
     if (!model.trim()) next.model = 'Model is required';
-    if (provider !== 'lmstudio' && !apiKey.trim()) next.apiKey = 'API key is required';
+    if (useApiKey && !apiKey.trim()) next.apiKey = 'API key is required';
     if ((provider === 'openai-compatible' || provider === 'lmstudio') && !baseUrl.trim()) {
       next.baseUrl = 'Base URL is required';
     }
@@ -66,7 +69,7 @@ export default function ConfigPanel({ config, onSave, onClose }: ConfigPanelProp
 
   const handleSave = () => {
     if (!validate()) return;
-    onSave({ provider, model, apiKey, baseUrl });
+    onSave({ provider, model, apiKey, baseUrl, useApiKey });
   };
 
   const handleClose = () => {
@@ -114,6 +117,16 @@ export default function ConfigPanel({ config, onSave, onClose }: ConfigPanelProp
 
         <div className="form-group">
           <label htmlFor="apiKey">API Key</label>
+          {provider === 'lmstudio' && (
+            <label className="use-apikey-toggle">
+              <input
+                type="checkbox"
+                checked={useApiKey}
+                onChange={(e) => setUseApiKey(e.target.checked)}
+              />
+              Use API Key
+            </label>
+          )}
           <div className="password-input">
             <input
               id="apiKey"
@@ -124,7 +137,7 @@ export default function ConfigPanel({ config, onSave, onClose }: ConfigPanelProp
                 if (errors.apiKey) setErrors((prev) => ({ ...prev, apiKey: '' }));
               }}
               placeholder="sk-..."
-              disabled={provider === 'lmstudio'}
+              disabled={provider === 'lmstudio' && !useApiKey}
               aria-invalid={!!errors.apiKey}
             />
             <button
@@ -136,7 +149,6 @@ export default function ConfigPanel({ config, onSave, onClose }: ConfigPanelProp
               {showApiKey ? 'Hide' : 'Show'}
             </button>
           </div>
-          {provider === 'lmstudio' && <span className="form-hint">Not required for LM Studio</span>}
           {errors.apiKey && <span className="error">{errors.apiKey}</span>}
         </div>
 
@@ -257,6 +269,23 @@ const styles = `
   .form-hint {
     font-size: 0.75rem;
     color: #a6adc8;
+  }
+
+  .use-apikey-toggle {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.8rem;
+    color: #a6adc8;
+    cursor: pointer;
+    margin-bottom: 4px;
+  }
+
+  .use-apikey-toggle input[type='checkbox'] {
+    accent-color: #89b4fa;
+    width: 14px;
+    height: 14px;
+    cursor: pointer;
   }
 
   .password-input {

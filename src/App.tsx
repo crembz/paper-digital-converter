@@ -172,12 +172,14 @@ export default function App() {
               onImageSelect={handleImageLoaded}
               onPdfSelect={handlePdfLoaded}
               onLoadingState={setPdfLoading}
+              onError={setError}
             />
           ) : pdfLoading ? (
             <ImageUploader
               onImageSelect={handleImageLoaded}
               onPdfSelect={handlePdfLoaded}
               onLoadingState={setPdfLoading}
+              onError={setError}
             />
           ) : (
             <ImagePreview

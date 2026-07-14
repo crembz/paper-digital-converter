@@ -1,0 +1,11 @@
+appId: paper-digital-converter
+directories:
+  output: dist
+win:
+  sign: null
+  signingHashAlgorithms: []
+  rfc3161TimeStampServer: ""
+  certificateSubjectName: null
+  signAndEditExecutable: false
+nsis:
+  oneClick: false

@@ -108,7 +108,7 @@ export async function convertImageToMarkdown(
   onChunk: (text: string) => void,
   signal: AbortSignal,
 ): Promise<string> {
-  if (!config.apiKey && config.provider !== 'lmstudio') {
+  if (config.useApiKey && !config.apiKey) {
     throw new Error('API key is not configured. Please set your LLM API key in the config panel.');
   }
 
