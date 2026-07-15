@@ -278,34 +278,6 @@ export default function App() {
     abortControllerRef.current?.abort();
   }, []);
 
-  const handleSelectFolder = useCallback(async () => {
-    if (typeof window.electronAPI === 'undefined') return;
-    const folderPath = await window.electronAPI.openDirectoryDialog();
-
-    if (folderPath) {
-      const isBatch = batchFiles.length > 0;
-      const targetFiles = isBatch
-        ? batchFiles.filter(Boolean).map(f => `${f!.filename.replace(/\.[^/.]+$/, '')}.md`)
-        : currentFilename ? [`${currentFilename.replace(/\.[^/.]+$/, '')}.md`] : [];
-
-      const existing: string[] = [];
-      for (const filename of targetFiles) {
-        const exists = await window.electronAPI.fileExists(folderPath + '/' + filename);
-        if (exists) {
-          existing.push(filename);
-        }
-      }
-
-      if (existing.length > 0) {
-        setExistingFiles(existing);
-        setOutputFolder(folderPath);
-        setShowConflictDialog(true);
-      } else {
-        setOutputFolder(folderPath);
-      }
-    }
-  }, [batchFiles, currentFilename]);
-
   const handleOpenFolder = useCallback(async () => {
     if (outputFolder) {
       await window.electronAPI.openFolder(outputFolder);
@@ -356,7 +328,6 @@ export default function App() {
 
   const hasPages = pages.length > 0;
   const hasBatchFiles = batchFiles.length > 0;
-  const needsOutputFolder = (hasPages || hasBatchFiles) && !outputFolder;
   const currentImage = hasPages ? pages[currentPage] ?? pages[0]! : null;
 
   return (
@@ -452,7 +423,6 @@ export default function App() {
         error={error}
         hasImage={hasPages || hasBatchFiles}
         hasConfig={!!config}
-        needsOutputFolder={needsOutputFolder}
         convertingPage={convertingPage}
         batchStatus={batchStatus}
         totalFiles={batchFiles.filter(Boolean).length}

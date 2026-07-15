@@ -7,7 +7,6 @@ interface StatusBarProps {
   onAbort: () => void;
   hasImage: boolean;
   hasConfig: boolean;
-  needsOutputFolder: boolean;
   convertingPage: { current: number; total: number } | null;
   batchStatus: 'idle' | 'processing' | 'done' | 'error';
   totalFiles: number;
@@ -50,11 +49,9 @@ function Spinner(): React.ReactElement {
 export default function StatusBar({
   isProcessing,
   error,
-  onConvert,
   onAbort,
   hasImage,
   hasConfig,
-  needsOutputFolder,
   convertingPage,
   batchStatus,
   totalFiles,
@@ -66,8 +63,6 @@ export default function StatusBar({
   onConvertWithFolder,
   onOpenFolder,
 }: StatusBarProps): React.ReactElement {
-  const convertDisabled = !hasImage || !hasConfig || isProcessing || needsOutputFolder;
-
   let statusClass = '';
   let statusContent: React.ReactNode;
 
