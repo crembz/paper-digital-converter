@@ -17,10 +17,12 @@ Electron + React desktop app. Converts paper notes to markdown via LLM vision mo
 - **Frameless window** — `electron/main.ts:20` sets `frame: false`. No native title bar or close button.
 - **pdfjs-dist worker** — pdfjs-dist worker is loaded from `public/pdf.worker.min.mjs` via local import in `src/utils/pdf.ts`. Vite config excludes `pdfjs-dist` from `optimizeDeps`.
 - **Promise.try polyfill** — `src/main.tsx` polyfills `globalThis.Promise.try` for pdfjs-dist compatibility.
+- **Conversion uses refs for conflict strategy** — `handleConvert` reads `conflictStrategyRef` and `existingFilesRef` (not state) to avoid stale closures when called from the conflict dialog buttons.
+- **Convert button disabled after completion** — `batchStatus === 'done'` disables the button in `StatusBar.tsx`. Reset by loading new files.
 
 ## Architecture
 
-- `electron/main.ts` — Main process, IPC handlers (config CRUD, file dialogs, file read/write). Config interface includes `useApiKey` boolean.
+- `electron/main.ts` — Main process, IPC handlers (config CRUD, file dialogs, file read/write, folder operations). Config interface includes `useApiKey` boolean.
 - `electron/preload.ts` — Exposes `window.electronAPI` via `contextBridge` (contextIsolation: true). Config interface includes `useApiKey` boolean.
 - `src/electron.d.ts` — TypeScript declarations for `window.electronAPI`. Keep in sync with preload. Config types include `useApiKey`.
 - `src/services/llm.ts` — LLM client abstraction. Anthropic and OpenAI/openai-compatible paths. API key check uses `config.useApiKey` instead of provider-based check.
@@ -28,6 +30,11 @@ Electron + React desktop app. Converts paper notes to markdown via LLM vision mo
 - `src/utils/prompt.ts` — OCR system prompt template.
 - `src/utils/pdf.ts` — PDF rendering via pdfjs-dist. Scale factor 3, uses `canvasContext` option, local worker import.
 - `src/main.tsx` — React entry point. Includes `Promise.try` polyfill for pdfjs-dist.
+- `src/App.tsx` — App state orchestrator. Manages conversion flow via `handleConvertWithFolder` (prompts for output folder if unset, checks file conflicts, shows conflict dialog). Uses `conflictStrategyRef`/`existingFilesRef` for stale closure prevention. `batchStatus` tracks conversion lifecycle (`idle` → `processing` → `done`/`error`).
+- `src/components/StatusBar.tsx` — Status text + action buttons. Convert button enabled when config exists and files are loaded. Shows "Open Output Folder" button when folder is set.
+- `src/components/ConfigPanel.tsx` — LLM provider config form.
+- `src/components/ImageUploader.tsx` — Drag-and-drop image/PDF upload.
+- `src/components/ImagePreview.tsx` — Single-page image preview with page navigation.
 - `electron-builder.yml` — electron-builder config (appId, win signing, nsis).
 - `scripts/` — Build helper scripts (`7za-wrap.js`, `prepare-wincodesign.cjs`).
 
@@ -39,6 +46,7 @@ Electron + React desktop app. Converts paper notes to markdown via LLM vision mo
 - **No monaco editor** — The markdown editor is a plain `<textarea>` (`src/components/MarkdownEditor.tsx`).
 - **Service layer**: business logic in `src/services/`, UI in `src/components/`.
 - **Config field `useApiKey`**: Controls whether a provider requires an API key. When `false` (e.g. LM Studio), API key field is optional and validation is skipped.
+- **Conversion flow**: `handleConvertWithFolder` → prompts for output folder (if unset) → checks file conflicts → shows conflict dialog → calls `handleConvert` with `conflictStrategyRef` set synchronously.
 
 ## Dependencies
 
@@ -56,7 +64,7 @@ You are the primary orchestrator. For any task falling within a subagent's domai
 | Subagent | Owned files | Task types |
 |---|---|---|
 | `electron` | `electron/main.ts`, `electron/preload.ts`, Electron config | IPC handlers, window creation, dialogs, FS access, tray/menus, preload bridge types |
-| `frontend` | `src/components/*`, `src/App.tsx`, `src/main.tsx`, `src/styles.css`, `src/index.html` | React components, UI layout, state management, user interactions, CSS styling |
+| `frontend` | `src/components/*`, `src/App.tsx`, `src/main.tsx`, `src/styles.css`, `index.html` | React components, UI layout, state management, user interactions, CSS styling |
 | `infra` | `package.json`, `tsconfig*.json`, `vite.config.ts`, `.gitignore`, `.env.example`, `config.example.json`, `src/services/config.ts`, `electron-builder.yml`, `scripts/`, `public/` | Dependencies, build config, TypeScript, Vite, packaging, config loading/defaults, CI/CD, pdfjs-dist worker |
 | `llm` | `src/services/llm.ts`, `src/utils/prompt.ts` | LLM client abstraction, streaming, OCR prompts, provider logic, model selection |
 

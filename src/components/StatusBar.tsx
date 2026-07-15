@@ -4,12 +4,20 @@ interface StatusBarProps {
   isProcessing: boolean;
   error: string | null;
   onConvert: () => void;
-  onSave: () => void;
   onAbort: () => void;
   hasImage: boolean;
   hasConfig: boolean;
-  hasMarkdown: boolean;
+  needsOutputFolder: boolean;
   convertingPage: { current: number; total: number } | null;
+  batchStatus: 'idle' | 'processing' | 'done' | 'error';
+  totalFiles: number;
+  filesConverted: number;
+  filesSkipped: number;
+  filesFailed: number;
+  outputFolder: string | null;
+  showConflictDialog: boolean;
+  onConvertWithFolder: () => void;
+  onOpenFolder: () => void;
 }
 
 function Spinner(): React.ReactElement {
@@ -43,38 +51,76 @@ export default function StatusBar({
   isProcessing,
   error,
   onConvert,
-  onSave,
   onAbort,
   hasImage,
   hasConfig,
-  hasMarkdown,
+  needsOutputFolder,
   convertingPage,
+  batchStatus,
+  totalFiles,
+  filesConverted,
+  filesSkipped,
+  filesFailed,
+  outputFolder,
+  showConflictDialog,
+  onConvertWithFolder,
+  onOpenFolder,
 }: StatusBarProps): React.ReactElement {
-  const convertDisabled = !hasImage || !hasConfig || isProcessing;
-  const saveDisabled = !hasMarkdown || isProcessing;
+  const convertDisabled = !hasImage || !hasConfig || isProcessing || needsOutputFolder;
 
-  let statusText: string;
-  let statusClass: string;
+  let statusClass = '';
+  let statusContent: React.ReactNode;
 
   if (error) {
-    statusText = error;
+    statusContent = error;
     statusClass = 'status-error';
   } else if (isProcessing && convertingPage) {
-    statusText = convertingPage.total > 1
+    statusContent = convertingPage.total > 1
       ? `Converting page ${convertingPage.current} of ${convertingPage.total}...`
       : 'Converting...';
     statusClass = 'status-processing';
   } else if (isProcessing) {
-    statusText = 'Converting...';
+    statusContent = 'Converting...';
     statusClass = 'status-processing';
+  } else if (batchStatus === 'processing') {
+    statusContent = `Processing files... (${filesConverted}/${totalFiles})`;
+    statusClass = 'status-processing';
+  } else if (batchStatus === 'done') {
+    const items: { label: string; color: string }[] = [];
+    if (filesConverted > 0) items.push({ label: `${filesConverted} converted`, color: '#4ade80' });
+    if (filesSkipped > 0) items.push({ label: `${filesSkipped} skipped`, color: '#facc15' });
+    if (filesFailed > 0) items.push({ label: `${filesFailed} failed`, color: '#f87171' });
+    statusContent = items.length > 0
+      ? items.map((item, i) => (
+          <span key={i}>
+            {i > 0 && ', '}
+            <span style={{ color: item.color }}>{item.label}</span>
+          </span>
+        ))
+      : 'Done — no files converted';
+    statusClass = 'status-done';
+  } else if (batchStatus === 'error') {
+    const items: { label: string; color: string }[] = [];
+    if (filesConverted > 0) items.push({ label: `${filesConverted} converted`, color: '#4ade80' });
+    if (filesSkipped > 0) items.push({ label: `${filesSkipped} skipped`, color: '#facc15' });
+    if (filesFailed > 0) items.push({ label: `${filesFailed} failed`, color: '#f87171' });
+    statusContent = items.length > 0
+      ? items.map((item, i) => (
+          <span key={i}>
+            {i > 0 && ', '}
+            <span style={{ color: item.color }}>{item.label}</span>
+          </span>
+        ))
+      : `Error — ${filesConverted} of ${totalFiles} files converted`;
+    statusClass = 'status-error';
   } else if (!hasConfig) {
-    statusText = 'Configure your LLM provider to begin';
+    statusContent = 'Configure your LLM provider to begin';
     statusClass = '';
   } else if (!hasImage) {
-    statusText = 'Ready — upload an image or PDF to convert';
+    statusContent = 'Ready — upload an image or PDF to convert';
     statusClass = '';
   } else {
-    statusText = 'Ready to convert';
+    statusContent = 'Ready to convert';
     statusClass = '';
   }
 
@@ -82,17 +128,28 @@ export default function StatusBar({
     <div className="status-bar">
       <span className={`status-text ${statusClass}`}>
         {isProcessing && <Spinner />}
-        {statusText}
+        {statusContent}
       </span>
 
       <div className="status-bar__actions">
-        <button
-          className="btn-primary"
-          onClick={onConvert}
-          disabled={convertDisabled}
-        >
-          Convert
-        </button>
+        {!isProcessing && batchStatus !== 'processing' && (
+          <button
+            className="btn-primary"
+            onClick={onConvertWithFolder}
+            disabled={!hasConfig || !hasImage || batchStatus === 'done'}
+          >
+            Convert
+          </button>
+        )}
+
+        {hasImage && outputFolder && !showConflictDialog && !isProcessing && batchStatus !== 'processing' && (
+          <button
+            className="btn-secondary"
+            onClick={onOpenFolder}
+          >
+            Open Output Folder
+          </button>
+        )}
 
         {isProcessing && (
           <button
@@ -102,14 +159,6 @@ export default function StatusBar({
             Abort
           </button>
         )}
-
-        <button
-          className="btn-secondary"
-          onClick={onSave}
-          disabled={saveDisabled}
-        >
-          Save as .md
-        </button>
       </div>
     </div>
   );

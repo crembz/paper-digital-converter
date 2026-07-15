@@ -20,6 +20,9 @@ export interface ElectronAPI {
   closeWindow(): Promise<void>;
   isMaximized(): Promise<boolean>;
   onWindowStateChanged(callback: (data: { maximized: boolean }) => void): () => void;
+  openFolder(path: string): Promise<void>;
+  openDirectoryDialog(): Promise<string | null>;
+  fileExists(path: string): Promise<boolean>;
 }
 
 const electronAPI: ElectronAPI = {
@@ -71,6 +74,18 @@ const electronAPI: ElectronAPI = {
     return () => {
       ipcRenderer.removeListener('window-state-changed', listener);
     };
+  },
+
+  openFolder: async (path: string): Promise<void> => {
+    return ipcRenderer.invoke('open-folder', path);
+  },
+
+  openDirectoryDialog: async (): Promise<string | null> => {
+    return ipcRenderer.invoke('open-directory-dialog');
+  },
+
+  fileExists: async (path: string): Promise<boolean> => {
+    return ipcRenderer.invoke('file-exists', path);
   },
 };
 

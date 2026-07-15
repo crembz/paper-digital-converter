@@ -146,3 +146,51 @@ ipcMain.handle('window-close', (): void => {
 ipcMain.handle('window-is-maximized', (): boolean => {
   return mainWindow?.isMaximized() ?? false;
 });
+
+ipcMain.handle('open-directory-dialog', async (): Promise<string | null> => {
+  try {
+    const result = await dialog.showOpenDialog(mainWindow!, {
+      properties: ['openDirectory'],
+    });
+    return result.canceled ? null : result.filePaths[0] || null;
+  } catch (error) {
+    throw new Error(`Directory dialog error: ${(error as Error).message}`);
+  }
+});
+
+ipcMain.handle('open-folder', async (_event, folderPath: string): Promise<void> => {
+  try {
+    await fs.access(folderPath);
+    if (process.platform === 'win32') {
+      const { spawn } = await import('child_process');
+      spawn('explorer', [folderPath], { detached: true, stdio: 'ignore' });
+    } else if (process.platform === 'darwin') {
+      const { execFile } = await import('child_process');
+      await new Promise<void>((resolve, reject) => {
+        execFile('open', [folderPath], (err) => {
+          if (err) reject(err);
+          else resolve();
+        });
+      });
+    } else {
+      const { execFile } = await import('child_process');
+      await new Promise<void>((resolve, reject) => {
+        execFile('xdg-open', [folderPath], (err) => {
+          if (err) reject(err);
+          else resolve();
+        });
+      });
+    }
+  } catch (error) {
+    throw new Error(`Failed to open folder: ${(error as Error).message}`);
+  }
+});
+
+ipcMain.handle('file-exists', async (_event, filePath: string): Promise<boolean> => {
+  try {
+    await fs.access(filePath);
+    return true;
+  } catch {
+    return false;
+  }
+});

@@ -1,5 +1,5 @@
 // Polyfill Promise.try for pdfjs-dist
-(globalThis.Promise as any).try = (fn) => {
+(globalThis.Promise as any).try = (fn: () => Promise<unknown>) => {
   try {
     return Promise.resolve(fn());
   } catch (e) {

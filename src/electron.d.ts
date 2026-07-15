@@ -1,7 +1,12 @@
+export interface BatchFileEntry {
+  pages: string[];
+  filename: string;
+}
+
 interface ElectronAPI {
   loadConfig(): Promise<{ provider: string; model: string; apiKey: string; baseUrl: string; useApiKey: boolean } | null>;
   saveConfig(config: { provider: string; model: string; apiKey: string; baseUrl: string; useApiKey: boolean }): Promise<void>;
-  openFileDialog(filters?: string[][]): Promise<string[] | null>;
+  openFileDialog(options?: Electron.OpenDialogOptions): Promise<string[] | null>;
   saveFileDialog(defaultPath?: string): Promise<string | null>;
   readFile(path: string, asBase64?: boolean): Promise<string>;
   writeFile(path: string, content: string): Promise<void>;
@@ -10,8 +15,15 @@ interface ElectronAPI {
   closeWindow(): Promise<void>;
   isMaximized(): Promise<boolean>;
   onWindowStateChanged(callback: (data: { maximized: boolean }) => void): () => void;
+  openFolder(path: string): Promise<void>;
+  openDirectoryDialog(): Promise<string | null>;
+  fileExists(path: string): Promise<boolean>;
 }
 
-interface Window {
-  electronAPI: ElectronAPI;
+declare global {
+  interface Window {
+    electronAPI: ElectronAPI;
+  }
 }
+
+export {};

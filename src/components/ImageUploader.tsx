@@ -3,8 +3,9 @@ import { useDropzone, type DropzoneOptions } from 'react-dropzone';
 import { renderPdfPages } from '../utils/pdf';
 
 interface ImageUploaderProps {
-  onImageSelect: (dataUri: string) => void;
+  onImageSelect: (dataUri: string, filename: string) => void;
   onPdfSelect: (pages: string[], filename: string) => void;
+  onFilesSelected: (files: Array<{ pages: string[]; filename: string }>) => void;
   onLoadingState: (loading: boolean) => void;
   onError?: (message: string) => void;
 }
@@ -33,44 +34,71 @@ function readFileAsDataUri(file: File): Promise<string> {
   });
 }
 
-export default function ImageUploader({ onImageSelect, onPdfSelect, onLoadingState, onError }: ImageUploaderProps) {
+export default function ImageUploader({ onImageSelect, onPdfSelect, onFilesSelected, onLoadingState, onError }: ImageUploaderProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const onDrop = useCallback(
     async (acceptedFiles: File[]) => {
-      const file = acceptedFiles[0];
-      if (!file) return;
+      if (acceptedFiles.length === 0) return;
 
       setError(null);
 
-      try {
-        if (file.type === 'application/pdf') {
-          setIsLoading(true);
-          onLoadingState(true);
-          const pages = await renderPdfPages(file);
-          onPdfSelect(pages, file.name);
-        } else {
-          const dataUri = await readFileAsDataUri(file);
-          onImageSelect(dataUri);
+      if (acceptedFiles.length === 1) {
+        const file = acceptedFiles[0];
+        try {
+          if (file.type === 'application/pdf') {
+            setIsLoading(true);
+            onLoadingState(true);
+            const pages = await renderPdfPages(file);
+            onPdfSelect(pages, file.name);
+          } else {
+            const dataUri = await readFileAsDataUri(file);
+            onImageSelect(dataUri, file.name);
+          }
+        } catch (err: unknown) {
+          const message = err instanceof Error ? err.message : 'Failed to process file';
+          setError(message);
+          onError?.(message);
+        } finally {
+          setIsLoading(false);
+          onLoadingState(false);
         }
-      } catch (err: unknown) {
-        const message = err instanceof Error ? err.message : 'Failed to process file';
-        setError(message);
-        onError?.(message);
-      } finally {
-        setIsLoading(false);
+      } else {
+        setIsLoading(true);
+        onLoadingState(true);
+        const batchFiles: Array<{ pages: string[]; filename: string }> = [];
+
+        for (const file of acceptedFiles) {
+          try {
+            if (file.type === 'application/pdf') {
+              const pages = await renderPdfPages(file);
+              batchFiles.push({ pages, filename: file.name });
+            } else {
+              const dataUri = await readFileAsDataUri(file);
+              batchFiles.push({ pages: [dataUri], filename: file.name });
+            }
+          } catch (err: unknown) {
+            const message = err instanceof Error ? err.message : `Failed to process ${file.name}`;
+            onError?.(`Failed to process ${file.name}: ${message}`);
+          }
+        }
+
         onLoadingState(false);
+        setIsLoading(false);
+
+        if (batchFiles.length > 0) {
+          onFilesSelected(batchFiles);
+        }
       }
     },
-    [onImageSelect, onPdfSelect, onLoadingState, onError],
+    [onImageSelect, onPdfSelect, onFilesSelected, onLoadingState, onError],
   );
 
   const dropzoneOptions: DropzoneOptions = {
     onDrop,
     accept: ACCEPTED_TYPES,
-    maxFiles: 1,
-    multiple: false,
+    multiple: true,
   };
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone(dropzoneOptions);
@@ -109,11 +137,11 @@ export default function ImageUploader({ onImageSelect, onPdfSelect, onLoadingSta
 
               <p className="dropzone__text">
                 {isDragActive
-                  ? 'Drop the file here'
-                  : 'Drag & drop an image or PDF, or click to browse'}
+                  ? 'Drop the files here'
+                  : 'Drag & drop images or PDFs, or click to browse'}
               </p>
 
-              <p className="dropzone__hint">PNG, JPG, TIFF, WEBP, PDF</p>
+              <p className="dropzone__hint">PNG, JPG, TIFF, WEBP, PDF — multiple files supported</p>
             </>
           )}
         </div>
