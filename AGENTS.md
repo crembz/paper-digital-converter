@@ -19,20 +19,21 @@ Electron + React desktop app. Converts paper notes to markdown via LLM vision mo
 - **Promise.try polyfill** — `src/main.tsx` polyfills `globalThis.Promise.try` for pdfjs-dist compatibility.
 - **Conversion uses refs for conflict strategy** — `handleConvert` reads `conflictStrategyRef` and `existingFilesRef` (not state) to avoid stale closures when called from the conflict dialog buttons.
 - **Convert button disabled after completion** — `batchStatus === 'done'` disables the button in `StatusBar.tsx`. Reset by loading new files.
+- **Model fetch must handle /v1 in baseUrl** — `fetchAvailableModels` in `src/services/llm.ts` checks if baseUrl ends with `/v1` before appending `/v1/models`. LM Studio's default base URL includes `/v1`, so blindly appending causes `/v1/v1/models`.
 
 ## Architecture
 
 - `electron/main.ts` — Main process, IPC handlers (config CRUD, file dialogs, file read/write, folder operations). Config interface includes `useApiKey` boolean.
 - `electron/preload.ts` — Exposes `window.electronAPI` via `contextBridge` (contextIsolation: true). Config interface includes `useApiKey` boolean.
 - `src/electron.d.ts` — TypeScript declarations for `window.electronAPI`. Keep in sync with preload. Config types include `useApiKey`.
-- `src/services/llm.ts` — LLM client abstraction. Anthropic and OpenAI/openai-compatible paths. API key check uses `config.useApiKey` instead of provider-based check.
+- `src/services/llm.ts` — LLM client abstraction. Anthropic, OpenAI/openai-compatible, Gemini, and LM Studio paths. API key check uses `config.useApiKey` instead of provider-based check. `fetchAvailableModels` handles provider-specific model API formats (OpenAI array, LM Studio single object, Anthropic, Gemini, Ollama).
 - `src/services/config.ts` — Config loading with env → file → defaults cascade. Uses `import.meta.env.VITE_*` (not `process.env.*`). AppConfig includes `useApiKey` boolean.
 - `src/utils/prompt.ts` — OCR system prompt template.
 - `src/utils/pdf.ts` — PDF rendering via pdfjs-dist. Scale factor 3, uses `canvasContext` option, local worker import.
 - `src/main.tsx` — React entry point. Includes `Promise.try` polyfill for pdfjs-dist.
 - `src/App.tsx` — App state orchestrator. Manages conversion flow via `handleConvertWithFolder` (prompts for output folder if unset, checks file conflicts, shows conflict dialog). Uses `conflictStrategyRef`/`existingFilesRef` for stale closure prevention. `batchStatus` tracks conversion lifecycle (`idle` → `processing` → `done`/`error`).
 - `src/components/StatusBar.tsx` — Status text + action buttons. Convert button enabled when config exists and files are loaded. Shows "Open Output Folder" button when folder is set.
-- `src/components/ConfigPanel.tsx` — LLM provider config form.
+- `src/components/ConfigPanel.tsx` — LLM provider config form with provider selector, API key input, base URL input, manual model input, and "Fetch Models" button.
 - `src/components/ImageUploader.tsx` — Drag-and-drop image/PDF upload.
 - `src/components/ImagePreview.tsx` — Single-page image preview with page navigation.
 - `electron-builder.yml` — electron-builder config (appId, win signing, nsis).

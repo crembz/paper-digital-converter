@@ -4,8 +4,8 @@ export interface BatchFileEntry {
 }
 
 interface ElectronAPI {
-  loadConfig(): Promise<{ provider: string; model: string; apiKey: string; baseUrl: string; useApiKey: boolean } | null>;
-  saveConfig(config: { provider: string; model: string; apiKey: string; baseUrl: string; useApiKey: boolean }): Promise<void>;
+  loadConfig(): Promise<{ provider: string; model: string; apiKey: string; baseUrl: string; useApiKey: boolean; availableModels: string[] } | null>;
+  saveConfig(config: { provider: string; model: string; apiKey: string; baseUrl: string; useApiKey: boolean; availableModels: string[] }): Promise<void>;
   openFileDialog(options?: Electron.OpenDialogOptions): Promise<string[] | null>;
   saveFileDialog(defaultPath?: string): Promise<string | null>;
   readFile(path: string, asBase64?: boolean): Promise<string>;

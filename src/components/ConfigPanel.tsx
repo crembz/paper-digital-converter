@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { AppConfig, getDefaultConfig } from '../services/config';
+import { fetchAvailableModels } from '../services/llm';
 
 type ConfigPanelProps = {
   config: AppConfig | null;
@@ -12,6 +13,8 @@ const PROVIDER_OPTIONS: AppConfig['provider'][] = [
   'anthropic',
   'openai-compatible',
   'lmstudio',
+  'gemini',
+  'ollama',
 ];
 
 export default function ConfigPanel({ config, onSave, onClose }: ConfigPanelProps) {
@@ -22,7 +25,10 @@ export default function ConfigPanel({ config, onSave, onClose }: ConfigPanelProp
   const [useApiKey, setUseApiKey] = useState(true);
   const [showApiKey, setShowApiKey] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
-
+  const [availableModels, setAvailableModels] = useState<string[]>([]);
+  const [fetchingModels, setFetchingModels] = useState(false);
+  const [fetchError, setFetchError] = useState<string | null>(null);
+  const [showManualModel, setShowManualModel] = useState(false);
   const syncDefaults = useCallback(
     (prov: AppConfig['provider']) => {
       const defaults = getDefaultConfig(prov);
@@ -44,13 +50,46 @@ export default function ConfigPanel({ config, onSave, onClose }: ConfigPanelProp
       syncDefaults('openai');
     }
     setErrors({});
+    setAvailableModels(config?.availableModels || []);
+    setFetchError(null);
   }, [config, syncDefaults]);
 
   const handleProviderChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const next = e.target.value as AppConfig['provider'];
     setProvider(next);
     syncDefaults(next);
+    setAvailableModels([]);
+    setFetchError(null);
+    setShowManualModel(false);
     setErrors({});
+  };
+
+  const handleFetchModels = async () => {
+    setFetchingModels(true);
+    setFetchError(null);
+    try {
+      const models = await fetchAvailableModels(provider, apiKey, baseUrl);
+      setAvailableModels(models);
+      setFetchingModels(false);
+    } catch (e) {
+      setFetchError(e instanceof Error ? e.message : 'Failed to fetch models');
+      setFetchingModels(false);
+    }
+  };
+
+  const handleModelSelect = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    if (e.target.value === '__other__') {
+      setShowManualModel(true);
+    } else {
+      setShowManualModel(false);
+      setModel(e.target.value);
+      if (errors.model) setErrors(prev => ({ ...prev, model: '' }));
+    }
+  };
+
+  const handleManualModelChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setModel(e.target.value);
+    if (errors.model) setErrors(prev => ({ ...prev, model: '' }));
   };
 
   const validate = (): boolean => {
@@ -59,7 +98,7 @@ export default function ConfigPanel({ config, onSave, onClose }: ConfigPanelProp
     if (!provider) next.provider = 'Provider is required';
     if (!model.trim()) next.model = 'Model is required';
     if (useApiKey && !apiKey.trim()) next.apiKey = 'API key is required';
-    if ((provider === 'openai-compatible' || provider === 'lmstudio') && !baseUrl.trim()) {
+    if ((provider === 'openai-compatible' || provider === 'lmstudio' || provider === 'ollama') && !baseUrl.trim()) {
       next.baseUrl = 'Base URL is required';
     }
 
@@ -69,13 +108,15 @@ export default function ConfigPanel({ config, onSave, onClose }: ConfigPanelProp
 
   const handleSave = () => {
     if (!validate()) return;
-    onSave({ provider, model, apiKey, baseUrl, useApiKey });
+    onSave({ provider, model, apiKey, baseUrl, useApiKey, availableModels });
   };
 
   const handleClose = () => {
     setErrors({});
     onClose();
   };
+
+  const isLocalProvider = provider === 'lmstudio' || provider === 'ollama';
 
   return (
     <div className="config-overlay" onClick={handleClose}>
@@ -100,24 +141,8 @@ export default function ConfigPanel({ config, onSave, onClose }: ConfigPanelProp
         </div>
 
         <div className="form-group">
-          <label htmlFor="model">Model</label>
-          <input
-            id="model"
-            type="text"
-            value={model}
-            onChange={(e) => {
-              setModel(e.target.value);
-              if (errors.model) setErrors((prev) => ({ ...prev, model: '' }));
-            }}
-            placeholder="e.g. gpt-4o"
-            aria-invalid={!!errors.model}
-          />
-          {errors.model && <span className="error">{errors.model}</span>}
-        </div>
-
-        <div className="form-group">
           <label htmlFor="apiKey">API Key</label>
-          {provider === 'lmstudio' && (
+          {isLocalProvider && (
             <label className="use-apikey-toggle">
               <input
                 type="checkbox"
@@ -134,16 +159,16 @@ export default function ConfigPanel({ config, onSave, onClose }: ConfigPanelProp
               value={apiKey}
               onChange={(e) => {
                 setApiKey(e.target.value);
-                if (errors.apiKey) setErrors((prev) => ({ ...prev, apiKey: '' }));
+                if (errors.apiKey) setErrors(prev => ({ ...prev, apiKey: '' }));
               }}
               placeholder="sk-..."
-              disabled={provider === 'lmstudio' && !useApiKey}
+              disabled={isLocalProvider && !useApiKey}
               aria-invalid={!!errors.apiKey}
             />
             <button
               type="button"
               className="toggle-visibility"
-              onClick={() => setShowApiKey((v) => !v)}
+              onClick={() => setShowApiKey(v => !v)}
               aria-label={showApiKey ? 'Hide API key' : 'Show API key'}
             >
               {showApiKey ? 'Hide' : 'Show'}
@@ -153,9 +178,68 @@ export default function ConfigPanel({ config, onSave, onClose }: ConfigPanelProp
         </div>
 
         <div className="form-group">
+          <label htmlFor="model">Model</label>
+          <div className="model-row">
+            {!showManualModel ? (
+              <select
+                id="model"
+                value={availableModels.includes(model) ? model : '__custom__'}
+                onChange={handleModelSelect}
+                aria-invalid={!!errors.model}
+              >
+                {availableModels.length > 0 && (
+                  <option value="" disabled>
+                    Select a model
+                  </option>
+                )}
+                {availableModels.map((m) => (
+                  <option key={m} value={m}>
+                    {m}
+                  </option>
+                ))}
+                <option value="__other__">Other...</option>
+              </select>
+            ) : (
+              <input
+                id="model"
+                type="text"
+                value={model}
+                onChange={handleManualModelChange}
+                placeholder="Enter model name"
+                aria-invalid={!!errors.model}
+              />
+            )}
+            <button
+              type="button"
+              className="btn-fetch"
+              onClick={handleFetchModels}
+              disabled={fetchingModels}
+              title="Fetch available models from the configured endpoint"
+            >
+              {fetchingModels ? 'Fetching...' : 'Fetch Models'}
+            </button>
+          </div>
+          {fetchError && (
+            <div className="fetch-error">
+              <span className="error">{fetchError}</span>
+              <button type="button" className="btn-retry" onClick={handleFetchModels}>
+                Retry
+              </button>
+            </div>
+          )}
+          {errors.model && <span className="error">{errors.model}</span>}
+        </div>
+
+        <div className="form-group">
           <label htmlFor="baseUrl">
             Base URL
             {provider === 'openai-compatible' && (
+              <span className="required-badge">Required</span>
+            )}
+            {provider === 'lmstudio' && (
+              <span className="required-badge">Required</span>
+            )}
+            {provider === 'ollama' && (
               <span className="required-badge">Required</span>
             )}
           </label>
@@ -165,7 +249,7 @@ export default function ConfigPanel({ config, onSave, onClose }: ConfigPanelProp
             value={baseUrl}
             onChange={(e) => {
               setBaseUrl(e.target.value);
-              if (errors.baseUrl) setErrors((prev) => ({ ...prev, baseUrl: '' }));
+              if (errors.baseUrl) setErrors(prev => ({ ...prev, baseUrl: '' }));
             }}
             placeholder="https://api.openai.com"
             aria-invalid={!!errors.baseUrl}
@@ -311,6 +395,60 @@ const styles = `
 
   .toggle-visibility:hover {
     background: #45475a;
+  }
+
+  .model-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+
+  .model-row select {
+    flex: 1;
+  }
+
+  .btn-fetch {
+    background: #89b4fa;
+    border: none;
+    color: #1e1e2e;
+    padding: 8px 14px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    font-weight: 600;
+    white-space: nowrap;
+    transition: opacity 0.15s;
+  }
+
+  .btn-fetch:hover:not(:disabled) {
+    opacity: 0.85;
+  }
+
+  .btn-fetch:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .fetch-error {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  .btn-retry {
+    background: transparent;
+    border: 1px solid #89b4fa;
+    color: #89b4fa;
+    padding: 2px 10px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+
+  .btn-retry:hover {
+    background: rgba(137, 180, 250, 0.15);
   }
 
   .config-actions {

@@ -1,9 +1,10 @@
 export interface AppConfig {
-  provider: 'openai' | 'anthropic' | 'openai-compatible' | 'lmstudio';
+  provider: 'openai' | 'anthropic' | 'openai-compatible' | 'lmstudio' | 'gemini' | 'ollama';
   model: string;
   apiKey: string;
   baseUrl: string;
   useApiKey: boolean;
+  availableModels: string[];
 }
 
 const PROVIDER_DEFAULTS: Record<string, Omit<AppConfig, 'apiKey'>> = {
@@ -12,24 +13,42 @@ const PROVIDER_DEFAULTS: Record<string, Omit<AppConfig, 'apiKey'>> = {
     model: 'gpt-4o',
     baseUrl: 'https://api.openai.com',
     useApiKey: true,
+    availableModels: [],
   },
   anthropic: {
     provider: 'anthropic',
     model: 'claude-sonnet-4-20250514',
     baseUrl: 'https://api.anthropic.com',
     useApiKey: true,
+    availableModels: [],
   },
   'openai-compatible': {
     provider: 'openai-compatible',
     model: '',
     baseUrl: '',
     useApiKey: true,
+    availableModels: [],
   },
   lmstudio: {
     provider: 'lmstudio',
     model: '',
     baseUrl: 'http://localhost:1234/v1',
     useApiKey: false,
+    availableModels: [],
+  },
+  gemini: {
+    provider: 'gemini',
+    model: 'gemini-2.5-flash',
+    baseUrl: 'https://generativelanguage.googleapis.com',
+    useApiKey: true,
+    availableModels: [],
+  },
+  ollama: {
+    provider: 'ollama',
+    model: '',
+    baseUrl: 'http://localhost:11434',
+    useApiKey: false,
+    availableModels: [],
   },
 };
 
@@ -42,6 +61,7 @@ export function getDefaultConfig(provider: string): AppConfig {
       apiKey: '',
       baseUrl: '',
       useApiKey: true,
+      availableModels: [],
     };
   }
   return { ...defaults, apiKey: '' };
@@ -62,6 +82,7 @@ export async function loadConfig(): Promise<AppConfig | null> {
       apiKey: envApiKey,
       baseUrl: envBaseUrl || '',
       useApiKey: true,
+      availableModels: [],
     };
   }
 
@@ -78,6 +99,7 @@ export async function loadConfig(): Promise<AppConfig | null> {
         apiKey: fileConfig.apiKey || envApiKey || '',
         baseUrl: fileConfig.baseUrl || defaults.baseUrl || envBaseUrl || '',
         useApiKey: fileConfig.useApiKey ?? defaults.useApiKey,
+        availableModels: fileConfig.availableModels || [],
       };
     }
   } catch {

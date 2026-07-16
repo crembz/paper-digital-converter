@@ -132,6 +132,13 @@ export async function convertImageToMarkdown(
     return convertWithAnthropic(client, config.model, imageBase64, onChunk, signal);
   }
 
+  if (config.provider === 'gemini') {
+    if (!config.apiKey) {
+      throw new Error('Gemini API key is not configured. Please set your LLM API key in the config panel.');
+    }
+    return convertWithGemini(config.apiKey, config.model, imageBase64, onChunk, signal);
+  }
+
   const openAIOpts: ConstructorParameters<typeof OpenAI>[0] = {
     apiKey: config.apiKey || '',
     dangerouslyAllowBrowser: true,
@@ -144,4 +151,117 @@ export async function convertImageToMarkdown(
   const client = new OpenAI(openAIOpts);
 
   return convertWithOpenAI(client, config.model, imageBase64, onChunk, signal);
+}
+
+async function convertWithGemini(
+  apiKey: string,
+  model: string,
+  imageBase64: string,
+  _onChunk: (text: string) => void,
+  signal: AbortSignal,
+): Promise<string> {
+  const mediaType = extractMediaType(imageBase64);
+  const base64Data = extractBase64(imageBase64);
+
+  const fullModelName = model.startsWith('models/') ? model : `models/${model}`;
+
+  const url = `https://generativelanguage.googleapis.com/v1beta/${fullModelName}:generateContent`;
+
+  const body = {
+    contents: [
+      {
+        parts: [
+          { inline_data: { mime_type: mediaType, data: base64Data } },
+        ],
+      },
+    ],
+  };
+
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-goog-api-key': apiKey,
+    },
+    body: JSON.stringify(body),
+    signal,
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Gemini API error (${res.status}): ${text}`);
+  }
+
+  const data = await res.json();
+  const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+  return text || '';
+}
+
+export async function fetchAvailableModels(
+  provider: string,
+  apiKey: string,
+  baseUrl: string,
+): Promise<string[]> {
+  switch (provider) {
+    case 'openai':
+    case 'openai-compatible':
+    case 'lmstudio': {
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+      if (apiKey) {
+        headers.Authorization = `Bearer ${apiKey}`;
+      }
+      const modelsPath = baseUrl.endsWith('/v1') ? '/models' : '/v1/models';
+      const url = `${baseUrl.replace(/\/+$/, '')}${modelsPath}`;
+      const res = await fetch(url, { headers });
+      if (!res.ok) {
+        const text = await res.text().catch(() => '');
+        throw new Error(`Failed to fetch models from ${provider} (${res.status}): ${text.slice(0, 500)}`);
+      }
+      const data = await res.json();
+      // OpenAI returns { data: [...] }, LM Studio may return a single object { id, object, created, owned_by }
+      if (Array.isArray(data.data)) {
+        return data.data.map((m: { id: string }) => m.id);
+      }
+      if (data.id && typeof data.id === 'string') {
+        return [data.id];
+      }
+      throw new Error(`Unexpected response format from ${provider}: ${JSON.stringify(data).slice(0, 500)}`);
+    }
+    case 'anthropic': {
+      const res = await fetch('https://api.anthropic.com/v1/messages/models', {
+        headers: {
+          'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01',
+          'Content-Type': 'application/json',
+        },
+      });
+      if (!res.ok) return [];
+      const data = await res.json();
+      return (data.models as { name: string }[] | undefined)?.map(m => m.name) || [];
+    }
+    case 'gemini': {
+      const res = await fetch(
+        'https://generativelanguage.googleapis.com/v1beta/models',
+        { headers: { 'x-goog-api-key': apiKey, 'Content-Type': 'application/json' } },
+      );
+      if (!res.ok) return [];
+      const data = await res.json();
+      return (data.models as { name: string; supportedGenerationMethods: string[] }[] | undefined)
+        ?.filter(m =>
+          m.name.startsWith('models/') &&
+          m.supportedGenerationMethods?.includes('generateContent')
+        )
+        .map(m => m.name.replace('models/', '')) || [];
+    }
+    case 'ollama': {
+      const res = await fetch(`${baseUrl}/api/tags`);
+      if (!res.ok) return [];
+      const data = await res.json();
+      return (data.models as { name: string }[] | undefined)?.map(m => m.name) || [];
+    }
+    default:
+      return [];
+  }
 }

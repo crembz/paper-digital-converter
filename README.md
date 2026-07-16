@@ -6,7 +6,9 @@ Desktop app that converts paper notes (photos/PDFs) into digital markdown using 
 
 - Drag & drop images or PDFs
 - Batch processing for multiple files
-- Configurable LLM provider (OpenAI, Anthropic, or OpenAI-compatible)
+- Configurable LLM provider (OpenAI, Anthropic, LM Studio, Gemini, Ollama, or OpenAI-compatible)
+- Fetch available models from provider API
+- Manual model input as fallback
 - Conflict resolution when output files already exist (rename, overwrite, skip)
 - Real-time conversion progress tracking
 - Editable markdown output
@@ -15,7 +17,7 @@ Desktop app that converts paper notes (photos/PDFs) into digital markdown using 
 ## Prerequisites
 
 - [Node.js](https://nodejs.org/) (v18 or later)
-- An API key for your chosen LLM provider
+- An API key for your chosen LLM provider (not required for LM Studio or Ollama)
 
 ## Getting Started
 
@@ -37,7 +39,27 @@ npm run build
 
 ## Configuration
 
-On first launch, select your LLM provider and enter your API key in the app settings panel.
+On first launch, configure your LLM provider in the app settings panel:
+
+1. **Select provider** — OpenAI, Anthropic, LM Studio, Gemini, Ollama, or OpenAI-compatible
+2. **Enter API key** — required for cloud providers (optional for LM Studio/Ollama)
+3. **Set base URL** — required for LM Studio and Ollama (e.g., `http://localhost:1234/v1` for LM Studio)
+4. **Fetch models** — click "Fetch Models" to load available models, or enter a model name manually
+5. **Select model** — choose from the fetched list or use the manual input field
+
+### LM Studio Setup
+
+1. Start LM Studio server (bottom-right "Local Server" → "Start Server")
+2. Set base URL to `http://localhost:1234/v1` (or your custom port)
+3. Set "Require API Key" to "Never" or enter your key if configured
+4. Click "Fetch Models" to see loaded models
+
+### Ollama Setup
+
+1. Start Ollama (`ollama serve`)
+2. Pull a model (`ollama pull llama3.2`)
+3. Base URL defaults to `http://localhost:11434`
+4. Click "Fetch Models" to see available models
 
 ### Environment Variables (Optional)
 
@@ -45,10 +67,10 @@ Override config by setting these in a `.env` file:
 
 | Variable | Description |
 |---|---|
-| `VITE_LLM_PROVIDER` | `openai`, `anthropic`, or custom provider name |
+| `VITE_LLM_PROVIDER` | `openai`, `anthropic`, `lmstudio`, `gemini`, `ollama`, or custom provider name |
 | `VITE_LLM_MODEL` | Model name (e.g. `gpt-4o`, `claude-sonnet-4-20250514`) |
 | `VITE_LLM_API_KEY` | API key |
-| `VITE_LLM_BASE_URL` | Custom API base URL (for OpenAI-compatible providers) |
+| `VITE_LLM_BASE_URL` | Custom API base URL (for LM Studio, Ollama, or OpenAI-compatible providers) |
 
 ## Usage
 

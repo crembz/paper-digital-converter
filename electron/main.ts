@@ -10,6 +10,7 @@ interface Config {
   apiKey: string;
   baseUrl: string;
   useApiKey: boolean;
+  availableModels: string[];
 }
 
 let mainWindow: BrowserWindow | null = null;
