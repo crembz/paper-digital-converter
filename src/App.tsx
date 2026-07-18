@@ -22,7 +22,7 @@ export default function App() {
   const [filesConverted, setFilesConverted] = useState(0);
   const [filesSkipped, setFilesSkipped] = useState(0);
   const [filesFailed, setFilesFailed] = useState(0);
-  const [outputFolder, setOutputFolder] = useState<string | null>(null);
+  const outputFolder = config?.outputFolder || null;
   const [currentFilename, setCurrentFilename] = useState<string | null>(null);
   const [conflictStrategy, setConflictStrategy] = useState<'rename' | 'overwrite' | 'skip' | null>(null);
   const [existingFiles, setExistingFiles] = useState<string[]>([]);
@@ -66,7 +66,6 @@ export default function App() {
     setFilesConverted(0);
     setFilesSkipped(0);
     setFilesFailed(0);
-    setOutputFolder(null);
     setCurrentFilename(filename);
     setConflictStrategy(null);
     setExistingFiles([]);
@@ -82,7 +81,6 @@ export default function App() {
     setFilesConverted(0);
     setFilesSkipped(0);
     setFilesFailed(0);
-    setOutputFolder(null);
     setCurrentFilename(filename);
     setConflictStrategy(null);
     setExistingFiles([]);
@@ -99,7 +97,6 @@ export default function App() {
     setFilesConverted(0);
     setFilesSkipped(0);
     setFilesFailed(0);
-    setOutputFolder(null);
     setCurrentFilename(null);
     setConflictStrategy(null);
     setExistingFiles([]);
@@ -116,7 +113,6 @@ export default function App() {
     setFilesConverted(0);
     setFilesSkipped(0);
     setFilesFailed(0);
-    setOutputFolder(null);
     setConflictStrategy(null);
     setExistingFiles([]);
     setShowConflictDialog(false);
@@ -286,39 +282,29 @@ export default function App() {
 
   const handleConvertWithFolder = useCallback(async () => {
     if (typeof window.electronAPI === 'undefined') return;
+    if (!outputFolder) return;
 
-    if (!outputFolder) {
-      const folderPath = await window.electronAPI.openDirectoryDialog();
+    const isBatch = batchFiles.length > 0;
+    const targetFiles = isBatch
+      ? batchFiles.filter(Boolean).map(f => `${f!.filename.replace(/\.[^/.]+$/, '')}.md`)
+      : currentFilename ? [`${currentFilename.replace(/\.[^/.]+$/, '')}.md`] : [];
 
-      if (!folderPath) return;
-
-      const isBatch = batchFiles.length > 0;
-      const targetFiles = isBatch
-        ? batchFiles.filter(Boolean).map(f => `${f!.filename.replace(/\.[^/.]+$/, '')}.md`)
-        : currentFilename ? [`${currentFilename.replace(/\.[^/.]+$/, '')}.md`] : [];
-
-      const existing: string[] = [];
-      for (const filename of targetFiles) {
-        const exists = await window.electronAPI.fileExists(folderPath + '/' + filename);
-        if (exists) {
-          existing.push(filename);
-        }
+    const existing: string[] = [];
+    for (const filename of targetFiles) {
+      const exists = await window.electronAPI.fileExists(outputFolder + '/' + filename);
+      if (exists) {
+        existing.push(filename);
       }
-
-      if (existing.length > 0) {
-        setExistingFiles(existing);
-        setOutputFolder(folderPath);
-        setShowConflictDialog(true);
-        return;
-      }
-
-      setOutputFolder(folderPath);
     }
 
-    if (conflictStrategy || !showConflictDialog) {
-      await handleConvert();
+    if (existing.length > 0) {
+      setExistingFiles(existing);
+      setShowConflictDialog(true);
+      return;
     }
-  }, [outputFolder, batchFiles, currentFilename, conflictStrategy, showConflictDialog, handleConvert]);
+
+    await handleConvert();
+  }, [outputFolder, batchFiles, currentFilename, handleConvert]);
 
   const handleConfigSaved = useCallback(async (savedConfig: AppConfig) => {
     await saveConfig(savedConfig);

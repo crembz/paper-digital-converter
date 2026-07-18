@@ -114,8 +114,12 @@ export default function StatusBar({
   } else if (!hasImage) {
     statusContent = 'Ready — upload an image or PDF to convert';
     statusClass = '';
+  } else if (!outputFolder) {
+    statusContent = 'Ready to convert — Set output folder in Settings';
+    statusClass = '';
   } else {
-    statusContent = 'Ready to convert';
+    const displayPath = outputFolder.split(/[\\/]/).pop() || outputFolder;
+    statusContent = `Ready to convert — Output: ${displayPath}`;
     statusClass = '';
   }
 
@@ -131,7 +135,7 @@ export default function StatusBar({
           <button
             className="btn-primary"
             onClick={onConvertWithFolder}
-            disabled={!hasConfig || !hasImage || batchStatus === 'done'}
+            disabled={!hasConfig || !hasImage || !outputFolder || batchStatus === 'done'}
           >
             Convert
           </button>

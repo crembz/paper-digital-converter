@@ -29,6 +29,7 @@ export default function ConfigPanel({ config, onSave, onClose }: ConfigPanelProp
   const [fetchingModels, setFetchingModels] = useState(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [showManualModel, setShowManualModel] = useState(false);
+  const [outputFolder, setOutputFolder] = useState('');
   const syncDefaults = useCallback(
     (prov: AppConfig['provider']) => {
       const defaults = getDefaultConfig(prov);
@@ -52,6 +53,7 @@ export default function ConfigPanel({ config, onSave, onClose }: ConfigPanelProp
     setErrors({});
     setAvailableModels(config?.availableModels || []);
     setFetchError(null);
+    setOutputFolder(config?.outputFolder || '');
   }, [config, syncDefaults]);
 
   const handleProviderChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -108,7 +110,7 @@ export default function ConfigPanel({ config, onSave, onClose }: ConfigPanelProp
 
   const handleSave = () => {
     if (!validate()) return;
-    onSave({ provider, model, apiKey, baseUrl, useApiKey, availableModels });
+    onSave({ provider, model, apiKey, baseUrl, useApiKey, availableModels, outputFolder: outputFolder || undefined });
   };
 
   const handleClose = () => {
@@ -117,6 +119,14 @@ export default function ConfigPanel({ config, onSave, onClose }: ConfigPanelProp
   };
 
   const isLocalProvider = provider === 'lmstudio' || provider === 'ollama';
+
+  const handleBrowseFolder = async () => {
+    if (typeof window.electronAPI === 'undefined') return;
+    const folder = await window.electronAPI.openDirectoryDialog();
+    if (folder) {
+      setOutputFolder(folder);
+    }
+  };
 
   return (
     <div className="config-overlay" onClick={handleClose}>
@@ -255,6 +265,37 @@ export default function ConfigPanel({ config, onSave, onClose }: ConfigPanelProp
             aria-invalid={!!errors.baseUrl}
           />
           {errors.baseUrl && <span className="error">{errors.baseUrl}</span>}
+        </div>
+
+        <div className="form-group">
+          <label htmlFor="outputFolder">Output Folder</label>
+          <div className="output-folder-row">
+            <input
+              id="outputFolder"
+              type="text"
+              value={outputFolder}
+              readOnly
+              placeholder="No folder set"
+            />
+            <div className="output-folder-actions">
+              <button
+                type="button"
+                className="btn-browse"
+                onClick={handleBrowseFolder}
+              >
+                Browse
+              </button>
+              {outputFolder && (
+                <button
+                  type="button"
+                  className="btn-clear"
+                  onClick={() => setOutputFolder('')}
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+          </div>
         </div>
 
         <div className="config-actions">
@@ -405,6 +446,8 @@ const styles = `
 
   .model-row select {
     flex: 1;
+    min-width: 0;
+    max-width: 200px;
   }
 
   .btn-fetch {
@@ -487,5 +530,52 @@ const styles = `
 
   .btn-save:hover {
     opacity: 0.85;
+  }
+
+  .output-folder-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+
+  .output-folder-row input {
+    flex: 1;
+  }
+
+  .output-folder-actions {
+    display: flex;
+    gap: 6px;
+  }
+
+  .btn-browse {
+    background: #89b4fa;
+    border: none;
+    color: #1e1e2e;
+    padding: 8px 14px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    font-weight: 600;
+    white-space: nowrap;
+    transition: opacity 0.15s;
+  }
+
+  .btn-browse:hover {
+    opacity: 0.85;
+  }
+
+  .btn-clear {
+    background: transparent;
+    border: 1px solid #45475a;
+    color: #a6adc8;
+    padding: 8px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.8rem;
+    transition: background 0.15s;
+  }
+
+  .btn-clear:hover {
+    background: #313244;
   }
 `;

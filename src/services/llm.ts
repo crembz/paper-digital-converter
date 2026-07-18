@@ -129,7 +129,9 @@ export async function convertImageToMarkdown(
     };
     const client = new Anthropic(anthropicOpts as never);
 
-    return convertWithAnthropic(client, config.model, imageBase64, onChunk, signal);
+    const result = await convertWithAnthropic(client, config.model, imageBase64, onChunk, signal);
+    (client as unknown as Record<string, unknown>)['lastResponse'] = undefined;
+    return result;
   }
 
   if (config.provider === 'gemini') {
@@ -150,7 +152,9 @@ export async function convertImageToMarkdown(
 
   const client = new OpenAI(openAIOpts);
 
-  return convertWithOpenAI(client, config.model, imageBase64, onChunk, signal);
+  const result = await convertWithOpenAI(client, config.model, imageBase64, onChunk, signal);
+  (client as unknown as Record<string, unknown>)['lastRequest'] = undefined;
+  return result;
 }
 
 async function convertWithGemini(

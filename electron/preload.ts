@@ -7,6 +7,7 @@ export interface Config {
   baseUrl: string;
   useApiKey: boolean;
   availableModels: string[];
+  outputFolder?: string;
 }
 
 export interface ElectronAPI {

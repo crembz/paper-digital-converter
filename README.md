@@ -46,6 +46,7 @@ On first launch, configure your LLM provider in the app settings panel:
 3. **Set base URL** — required for LM Studio and Ollama (e.g., `http://localhost:1234/v1` for LM Studio)
 4. **Fetch models** — click "Fetch Models" to load available models, or enter a model name manually
 5. **Select model** — choose from the fetched list or use the manual input field
+6. **Set output folder** — click "Browse" to choose where converted markdown files will be saved
 
 ### LM Studio Setup
 
@@ -74,9 +75,9 @@ Override config by setting these in a `.env` file:
 
 ## Usage
 
-1. **Configure** your LLM provider in the settings panel
+1. **Configure** your LLM provider and set output folder in the settings panel
 2. **Upload** images or PDFs via drag & drop or file picker
-3. **Convert** — click Convert, select an output folder
+3. **Convert** — click Convert (output folder must be set in Settings)
 4. **Edit** — review and edit the generated markdown in the output panel
 5. **Save** — the markdown is saved to your chosen folder automatically
 

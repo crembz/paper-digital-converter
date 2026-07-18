@@ -5,6 +5,7 @@ export interface AppConfig {
   baseUrl: string;
   useApiKey: boolean;
   availableModels: string[];
+  outputFolder?: string;
 }
 
 const PROVIDER_DEFAULTS: Record<string, Omit<AppConfig, 'apiKey'>> = {
@@ -64,7 +65,7 @@ export function getDefaultConfig(provider: string): AppConfig {
       availableModels: [],
     };
   }
-  return { ...defaults, apiKey: '' };
+  return { ...defaults, apiKey: '', outputFolder: '' };
 }
 
 export async function loadConfig(): Promise<AppConfig | null> {
@@ -83,6 +84,7 @@ export async function loadConfig(): Promise<AppConfig | null> {
       baseUrl: envBaseUrl || '',
       useApiKey: true,
       availableModels: [],
+      outputFolder: '',
     };
   }
 
@@ -100,6 +102,7 @@ export async function loadConfig(): Promise<AppConfig | null> {
         baseUrl: fileConfig.baseUrl || defaults.baseUrl || envBaseUrl || '',
         useApiKey: fileConfig.useApiKey ?? defaults.useApiKey,
         availableModels: fileConfig.availableModels || [],
+        outputFolder: fileConfig.outputFolder || '',
       };
     }
   } catch {

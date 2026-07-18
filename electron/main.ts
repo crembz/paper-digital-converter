@@ -11,6 +11,7 @@ interface Config {
   baseUrl: string;
   useApiKey: boolean;
   availableModels: string[];
+  outputFolder?: string;
 }
 
 let mainWindow: BrowserWindow | null = null;

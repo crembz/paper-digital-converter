@@ -13,7 +13,7 @@ Electron + React desktop app. Converts paper notes to markdown via LLM vision mo
 
 - **LLM SDKs run in the renderer** — OpenAI/Anthropic clients are instantiated in `src/services/llm.ts` (browser env). Both constructors must include `dangerouslyAllowBrowser: true` or the SDKs throw on startup.
 - **Config lives in Electron's userData** — `config.json` is read/written via IPC to `app.getPath('userData')`, never the project root. It's `.gitignore`d.
-- **Env vars override file config** — `VITE_LLM_PROVIDER`, `VITE_LLM_MODEL`, `VITE_LLM_API_KEY`, `VITE_LLM_BASE_URL` in `.env` take precedence over the saved `config.json` (`src/services/config.ts`).
+- **Env vars override file config** — `VITE_LLM_PROVIDER`, `VITE_LLM_MODEL`, `VITE_LLM_API_KEY`, `VITE_LLM_BASE_URL` in `.env` take precedence over the saved `config.json` (`src/services/config.ts`). `VITE_OUTPUT_FOLDER` is NOT supported — output folder must be set in the Settings panel.
 - **Frameless window** — `electron/main.ts:20` sets `frame: false`. No native title bar or close button.
 - **pdfjs-dist worker** — pdfjs-dist worker is loaded from `public/pdf.worker.min.mjs` via local import in `src/utils/pdf.ts`. Vite config excludes `pdfjs-dist` from `optimizeDeps`.
 - **Promise.try polyfill** — `src/main.tsx` polyfills `globalThis.Promise.try` for pdfjs-dist compatibility.
@@ -27,7 +27,7 @@ Electron + React desktop app. Converts paper notes to markdown via LLM vision mo
 - `electron/preload.ts` — Exposes `window.electronAPI` via `contextBridge` (contextIsolation: true). Config interface includes `useApiKey` boolean.
 - `src/electron.d.ts` — TypeScript declarations for `window.electronAPI`. Keep in sync with preload. Config types include `useApiKey`.
 - `src/services/llm.ts` — LLM client abstraction. Anthropic, OpenAI/openai-compatible, Gemini, and LM Studio paths. API key check uses `config.useApiKey` instead of provider-based check. `fetchAvailableModels` handles provider-specific model API formats (OpenAI array, LM Studio single object, Anthropic, Gemini, Ollama).
-- `src/services/config.ts` — Config loading with env → file → defaults cascade. Uses `import.meta.env.VITE_*` (not `process.env.*`). AppConfig includes `useApiKey` boolean.
+- `src/services/config.ts` — Config loading with env → file → defaults cascade. Uses `import.meta.env.VITE_*` (not `process.env.*`). AppConfig includes `useApiKey` boolean and `outputFolder` string.
 - `src/utils/prompt.ts` — OCR system prompt template.
 - `src/utils/pdf.ts` — PDF rendering via pdfjs-dist. Scale factor 3, uses `canvasContext` option, local worker import.
 - `src/main.tsx` — React entry point. Includes `Promise.try` polyfill for pdfjs-dist.
@@ -47,7 +47,7 @@ Electron + React desktop app. Converts paper notes to markdown via LLM vision mo
 - **No monaco editor** — The markdown editor is a plain `<textarea>` (`src/components/MarkdownEditor.tsx`).
 - **Service layer**: business logic in `src/services/`, UI in `src/components/`.
 - **Config field `useApiKey`**: Controls whether a provider requires an API key. When `false` (e.g. LM Studio), API key field is optional and validation is skipped.
-- **Conversion flow**: `handleConvertWithFolder` → prompts for output folder (if unset) → checks file conflicts → shows conflict dialog → calls `handleConvert` with `conflictStrategyRef` set synchronously.
+- **Conversion flow**: `handleConvertWithFolder` → checks output folder from config → checks file conflicts → shows conflict dialog → calls `handleConvert` with `conflictStrategyRef` set synchronously. Output folder is set in Settings, not prompted at conversion time.
 
 ## Dependencies
 
