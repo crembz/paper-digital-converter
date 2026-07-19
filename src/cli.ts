@@ -148,14 +148,16 @@ export async function main() {
   const provider = opts.provider || configFile?.provider || 'openai';
   const defaults = PROVIDER_DEFAULTS[provider] || PROVIDER_DEFAULTS['openai-compatible'];
 
+  const configUseApiKey: boolean = opts.apiKey !== undefined
+    ? true
+    : (configFile?.useApiKey ?? defaults.useApiKey) ?? true;
+
   const config: CliConfig = {
     provider: opts.provider || configFile?.provider || defaults.provider,
     model: opts.model || configFile?.model || defaults.model,
     apiKey: opts.apiKey || configFile?.apiKey || '',
     baseUrl: opts.baseUrl || configFile?.baseUrl || defaults.baseUrl,
-    useApiKey: opts.apiKey !== undefined
-      ? true
-      : (configFile?.useApiKey ?? defaults.useApiKey),
+    useApiKey: configUseApiKey,
     availableModels: [],
     outputFolder: outputDir,
   };
@@ -200,7 +202,7 @@ export async function main() {
         }
 
         const pageResult = await convertImageToMarkdown(
-          config,
+          config as never,
           pages[i],
           (chunk) => {
             if (opts.stream) {
