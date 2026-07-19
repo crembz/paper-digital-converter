@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppConfig, loadConfig, saveConfig } from './services/config';
 import { convertImageToMarkdown } from './services/llm';
+import { renderPdfPages } from './utils/pdf';
 import ImageUploader from './components/ImageUploader';
 import ImagePreview from './components/ImagePreview';
 import StatusBar from './components/StatusBar';
@@ -16,7 +17,7 @@ export default function App() {
   const [isMaximized, setIsMaximized] = useState(false);
   const [pdfLoading, setPdfLoading] = useState(false);
   const [convertingPage, setConvertingPage] = useState<{ current: number; total: number } | null>(null);
-  const [batchFiles, setBatchFiles] = useState<Array<{ pages: string[]; filename: string } | null>>([]);
+  const [batchFiles, setBatchFiles] = useState<Array<{ filePath: string; filename: string; fileType: 'image' | 'pdf' } | null>>([]);
   const [currentFileIndex, setCurrentFileIndex] = useState(0);
   const [batchStatus, setBatchStatus] = useState<'idle' | 'processing' | 'done' | 'error'>('idle');
   const [filesConverted, setFilesConverted] = useState(0);
@@ -87,7 +88,7 @@ export default function App() {
     setShowConflictDialog(false);
   }, []);
 
-  const handleFilesSelected = useCallback((files: Array<{ pages: string[]; filename: string }>) => {
+  const handleFilesSelected = useCallback((files: Array<{ filePath: string; filename: string; fileType: 'image' | 'pdf' }>) => {
     setPages([]);
     setCurrentPage(0);
     setError(null);
@@ -116,6 +117,26 @@ export default function App() {
     setConflictStrategy(null);
     setExistingFiles([]);
     setShowConflictDialog(false);
+  }, []);
+
+  const loadPagesFromPath = useCallback(async (filePath: string, fileType: 'image' | 'pdf'): Promise<string[]> => {
+    if (!filePath) return [];
+
+    if (fileType === 'pdf') {
+      const base64 = await window.electronAPI.readFileAsBase64(filePath);
+      const base64Data = base64.indexOf(',') !== -1 ? base64.slice(base64.indexOf(',') + 1) : base64;
+      const byteString = atob(base64Data);
+      const ab = new ArrayBuffer(byteString.length);
+      const ia = new Uint8Array(ab);
+      for (let i = 0; i < byteString.length; i++) {
+        ia[i] = byteString.charCodeAt(i);
+      }
+      const pdfFile = new File([ab], 'document.pdf', { type: 'application/pdf' });
+      return renderPdfPages(pdfFile);
+    } else {
+      const dataUri = await window.electronAPI.readFileAsBase64(filePath);
+      return [dataUri];
+    }
   }, []);
 
   const handleConvert = useCallback(async () => {
@@ -155,26 +176,28 @@ export default function App() {
           }
 
           setCurrentFileIndex(f);
-          setConvertingPage({ current: 1, total: file.pages.length });
 
           try {
+            const pages = await loadPagesFromPath(file.filePath, file.fileType);
+            setConvertingPage({ current: 1, total: pages.length });
+
             let fileResult = '';
 
-            for (let p = 0; p < file.pages.length; p++) {
+            for (let p = 0; p < pages.length; p++) {
               if (abortController.signal.aborted) break;
 
-              setConvertingPage({ current: p + 1, total: file.pages.length });
+              setConvertingPage({ current: p + 1, total: pages.length });
 
               const pageResult = await convertImageToMarkdown(
                 config,
-                file.pages[p],
+                pages[p],
                 () => {},
                 abortController.signal,
               );
 
               fileResult += pageResult;
 
-              if (p < file.pages.length - 1) {
+              if (p < pages.length - 1) {
                 fileResult += '\n\n---\n\n';
               }
             }
@@ -268,7 +291,7 @@ export default function App() {
       setConvertingPage(null);
       abortControllerRef.current = null;
     }
-  }, [config, pages, batchFiles, outputFolder, currentFilename]);
+  }, [config, pages, batchFiles, outputFolder, currentFilename, loadPagesFromPath]);
 
   const handleAbort = useCallback(() => {
     abortControllerRef.current?.abort();
@@ -363,16 +386,17 @@ export default function App() {
                 <div
                   key={index}
                   className={`batch-file ${file ? 'batch-file--valid' : 'batch-file--error'} ${currentFileIndex === index ? 'batch-file--current' : ''}`}
-                  onClick={() => {
+                  onClick={async () => {
                     if (file) {
                       setCurrentFileIndex(index);
-                      setPages(file.pages);
+                      const pages = await loadPagesFromPath(file.filePath, file.fileType);
+                      setPages(pages);
                       setCurrentPage(0);
                     }
                   }}
                 >
                   <span className="batch-file__name">{file?.filename ?? 'Failed to load'}</span>
-                  <span className="batch-file__pages">{file ? file.pages.length : 0} page{file && file.pages.length !== 1 ? 's' : ''}</span>
+                  <span className="batch-file__pages">{file ? (file.fileType === 'pdf' ? 'PDF' : 'Image') : 'Failed'}</span>
                 </div>
               ))}
             </div>

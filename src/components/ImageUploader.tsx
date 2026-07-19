@@ -1,11 +1,10 @@
 import { useCallback, useState } from 'react';
 import { useDropzone, type DropzoneOptions } from 'react-dropzone';
-import { renderPdfPages } from '../utils/pdf';
 
 interface ImageUploaderProps {
   onImageSelect: (dataUri: string, filename: string) => void;
   onPdfSelect: (pages: string[], filename: string) => void;
-  onFilesSelected: (files: Array<{ pages: string[]; filename: string }>) => void;
+  onFilesSelected: (files: Array<{ filePath: string; filename: string; fileType: 'image' | 'pdf' }>) => void;
   onLoadingState: (loading: boolean) => void;
   onError?: (message: string) => void;
 }
@@ -50,7 +49,7 @@ export default function ImageUploader({ onImageSelect, onPdfSelect, onFilesSelec
           if (file.type === 'application/pdf') {
             setIsLoading(true);
             onLoadingState(true);
-            const pages = await renderPdfPages(file);
+            const pages = await (await import('../utils/pdf')).renderPdfPages(file);
             onPdfSelect(pages, file.name);
           } else {
             const dataUri = await readFileAsDataUri(file);
@@ -67,21 +66,15 @@ export default function ImageUploader({ onImageSelect, onPdfSelect, onFilesSelec
       } else {
         setIsLoading(true);
         onLoadingState(true);
-        const batchFiles: Array<{ pages: string[]; filename: string }> = [];
+        const batchFiles: Array<{ filePath: string; filename: string; fileType: 'image' | 'pdf' }> = [];
 
         for (const file of acceptedFiles) {
-          try {
-            if (file.type === 'application/pdf') {
-              const pages = await renderPdfPages(file);
-              batchFiles.push({ pages, filename: file.name });
-            } else {
-              const dataUri = await readFileAsDataUri(file);
-              batchFiles.push({ pages: [dataUri], filename: file.name });
-            }
-          } catch (err: unknown) {
-            const message = err instanceof Error ? err.message : `Failed to process ${file.name}`;
-            onError?.(`Failed to process ${file.name}: ${message}`);
-          }
+          const isPdf = file.type === 'application/pdf';
+          batchFiles.push({
+            filePath: file.path || '',
+            filename: file.name,
+            fileType: isPdf ? 'pdf' : 'image',
+          });
         }
 
         onLoadingState(false);

@@ -9,6 +9,7 @@ interface ElectronAPI {
   openFileDialog(options?: Electron.OpenDialogOptions): Promise<string[] | null>;
   saveFileDialog(defaultPath?: string): Promise<string | null>;
   readFile(path: string, asBase64?: boolean): Promise<string>;
+  readFileAsBase64(path: string): Promise<string>;
   writeFile(path: string, content: string): Promise<void>;
   minimizeWindow(): Promise<void>;
   maximizeWindow(): Promise<void>;

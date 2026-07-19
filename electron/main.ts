@@ -121,6 +121,15 @@ ipcMain.handle('read-file', async (_event, filePath: string, asBase64 = false): 
   }
 });
 
+ipcMain.handle('read-file-as-base64', async (_event, filePath: string): Promise<string> => {
+  try {
+    const buffer = await fs.readFile(filePath);
+    return 'data:image/png;base64,' + buffer.toString('base64');
+  } catch (error) {
+    throw new Error(`Failed to read file: ${(error as Error).message}`);
+  }
+});
+
 ipcMain.handle('write-file', async (_event, filePath: string, content: string): Promise<void> => {
   try {
     await fs.writeFile(filePath, content, 'utf-8');

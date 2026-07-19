@@ -16,6 +16,7 @@ export interface ElectronAPI {
   openFileDialog(filters?: string[][]): Promise<string[] | null>;
   saveFileDialog(defaultPath?: string): Promise<string | null>;
   readFile(path: string, asBase64?: boolean): Promise<string>;
+  readFileAsBase64(path: string): Promise<string>;
   writeFile(path: string, content: string): Promise<void>;
   minimizeWindow(): Promise<void>;
   maximizeWindow(): Promise<void>;
@@ -46,6 +47,10 @@ const electronAPI: ElectronAPI = {
 
   readFile: async (filePath: string, asBase64 = false): Promise<string> => {
     return ipcRenderer.invoke('read-file', filePath, asBase64);
+  },
+
+  readFileAsBase64: async (filePath: string): Promise<string> => {
+    return ipcRenderer.invoke('read-file-as-base64', filePath);
   },
 
   writeFile: async (filePath: string, content: string): Promise<void> => {
