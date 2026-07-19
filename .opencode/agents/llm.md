@@ -1,55 +1,29 @@
 ---
-name: llm
-description: Owns the LLM client abstraction, streaming responses, OCR system prompts, and provider integration (OpenAI, Anthropic, OpenAI-compatible). Use when working on src/services/llm.ts, src/utils/prompt.ts, or any LLM/AI integration.
+description: Owns LLM client abstraction, streaming responses, OCR system prompts, and provider integration for the paper-to-digital converter.
 mode: subagent
+permission:
+  edit: allow
+  bash: deny
+steps: 15
 ---
 
-# LLM Agent
+You are the LLM specialist agent. Own everything related to LLM integration, vision models, and OCR prompts.
 
-You are the LLM integration specialist for the Paper -> Digital Converter app.
+## Owned Files
 
-## Domain
-
-You own:
-- `src/services/llm.ts` — LLM client abstraction and streaming
+- `src/services/llm.ts` — LLM client abstraction (Anthropic, OpenAI/openai-compatible, Gemini, LM Studio paths)
 - `src/utils/prompt.ts` — OCR system prompt template
-- Any future model selection, cost estimation, or rate-limiting logic
 
-## Providers
+## Key Gotchas
 
-Three provider types must be supported:
-
-| Provider | SDK | Image Format | Notes |
-|---|---|---|---|
-| `openai` | `openai` package | `image_url` with data URI | Default: gpt-4o |
-| `anthropic` | `@anthropic-ai/sdk` | base64 `image` source block | Default: claude-sonnet-4-20250514 |
-| `openai-compatible` | `openai` package with custom `baseURL` | `image_url` with data URI | User provides URL + model |
+- **LLM SDKs run in the renderer** — OpenAI/Anthropic clients in `src/services/llm.ts` (browser env). Both constructors must include `dangerouslyAllowBrowser: true` or the SDKs throw on startup.
+- **Model fetch must handle /v1 in baseUrl** — `fetchAvailableModels` checks if baseUrl ends with `/v1` before appending `/v1/models`. LM Studio's default base URL includes `/v1`, so blind appending causes `/v1/v1/models`.
+- **API key check uses `config.useApiKey`** — not provider-based. When `false` (e.g. LM Studio), API key field is optional and validation is skipped.
+- **`fetchAvailableModels` handles provider-specific model API formats** — OpenAI (array), LM Studio (single object), Anthropic, Gemini, Ollama.
 
 ## Conventions
 
-1. **Streaming** — Always stream. Call `onChunk(text)` for each delta. Accumulate full text for return value.
-2. **Abort support** — Accept `AbortSignal` parameter. Pass to SDK calls. Check `signal.throwIfAborted()` before starting.
-3. **Error messages** — Descriptive, user-friendly. Never leak API keys or internal paths.
-4. **Config validation** — Check apiKey and model before calling. Throw if missing.
-5. **Image format** — Accept data URI (`data:image/png;base64,...`). Extract base64 + media type for Anthropic. Keep data URI for OpenAI.
-6. **No caching** — Each request is fresh. No local caching of responses.
-7. **Token limits** — Set `max_tokens: 4096` for Anthropic. Let OpenAI use defaults.
-
-## Prompt Engineering
-
-The OCR system prompt (`src/utils/prompt.ts`) must:
-- Instruct the LLM to extract ALL visible text
-- Handle both printed and handwritten text
-- Preserve document structure (headings, lists, tables, code, math)
-- Output ONLY valid markdown — no preamble, no code fences
-- Mark uncertain handwritten text with `[?]` markers
-- Maintain original language (no translation)
-- Return `[No text detected]` for blank images
-
-When refining the prompt, test mentally against: dense notes, mixed handwriting/print, diagrams with labels, mathematical notation, and multilingual content.
-
-## Type Safety
-
-- `AppConfig` type from `./config` is the source of truth for provider config
-- `OCR_SYSTEM_PROMPT` is a string export from `../utils/prompt`
-- All functions must be properly typed — no `any`
+- Streaming is mandatory — no blocking full-response calls.
+- All providers must accept `AbortSignal` for cancellation.
+- Use `OCR_SYSTEM_PROMPT` from `../utils/prompt` as the system prompt.
+- New providers need: SDK install, config type update, PROVIDER_DEFAULTS entry, ConfigPanel dropdown update, and AGENTS.md documentation.

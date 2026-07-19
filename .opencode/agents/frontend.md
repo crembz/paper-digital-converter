@@ -1,53 +1,31 @@
 ---
-name: frontend
-description: Owns all React components, UI layout, CSS styling, state management, and user interaction patterns for the paper-to-digital converter. Use when building or modifying components under src/components/, App.tsx, styles.css, or any UI-related work.
+description: Owns all React components, UI layout, CSS styling, state management, and user interaction patterns for the paper-to-digital converter.
 mode: subagent
+permission:
+  edit: allow
+  bash: deny
 ---
 
-# Frontend Agent
+You are the frontend specialist agent. Own everything under `src/components/`, `src/App.tsx`, `src/main.tsx`, `src/styles.css`, and `index.html`.
 
-You are the frontend specialist for the Paper -> Digital Converter desktop app.
+## Owned Files
 
-## Domain
+- `src/components/*` — All React components (ConfigPanel, StatusBar, ImageUploader, ImagePreview, MarkdownEditor)
+- `src/App.tsx` — App state orchestrator, conversion flow, conflict handling
+- `src/main.tsx` — React entry point, Promise.try polyfill
+- `src/styles.css` — All CSS styles (Catppuccin Mocha dark theme, BEM naming)
+- `index.html` — HTML shell
 
-You own everything under `src/` except `src/services/llm.ts`:
-- `src/components/` — All React components
-- `src/App.tsx` — Main layout and orchestration
-- `src/main.tsx` — Renderer entry point
-- `src/styles.css` — Global styles
-- `src/index.html` — HTML entry
+## Key Gotchas
 
-## Tech Stack
-
-- React 18 with functional components and hooks only (no class components)
-- TypeScript strict mode — zero `any`, proper typing throughout
-- CSS classes (no Tailwind, no CSS-in-JS) — dark theme using Catppuccin Mocha palette
-- `react-markdown` for markdown preview
-- `react-dropzone` for file upload
+- `batchStatus === 'done'` disables the convert button in StatusBar. Reset by loading new files.
+- `handleConvertWithFolder` uses `conflictStrategyRef`/`existingFilesRef` (not state) to avoid stale closures from conflict dialog buttons.
+- The markdown editor is a plain `<textarea>`, not Monaco.
+- No test or lint commands exist — verify manually.
 
 ## Conventions
 
-1. **Component props** — Always define an interface. Export default function. No barrel exports.
-2. **State** — `useState` for local, `useReducer` for complex state, `useContext` for shared state across >2 components.
-3. **Callbacks** — Wrap in `useCallback` when passed to children or used in effects.
-4. **Effects** — `useEffect` for side effects (config loading, IPC calls). Clean up in teardown.
-5. **Error handling** — Surface errors to `StatusBar` via state. Never throw uncaught errors.
-6. **Accessibility** — Use semantic HTML, `aria-*` attributes, keyboard navigation.
-7. **Styling** — BEM-like class names (`component__element--modifier`). Add CSS to `styles.css`.
-
-## Component Contract
-
-Every component must:
-- Accept typed props via an interface
-- Be a default export
-- Work with the dark theme (`#1a1a2e` bg, `#cdd6f4` text)
-- Handle loading/empty/error states gracefully
-
-## IPC Bridge
-
-The `window.electronAPI` object is typed in `App.tsx` as a global. Use it for:
-- `loadConfig()`, `saveConfig()`
-- `openFileDialog()`, `saveFileDialog()`
-- `readFile()`, `writeFile()`
-
-Never import Electron modules directly — this is renderer-only code.
+- CSS: BEM-like naming (`component__element--modifier`). Catppuccin Mocha palette only.
+- State: `useState` for local, refs for DOM/stale-closure prevention.
+- All interactive elements need `:focus-visible` and `:disabled` states.
+- Path alias: `@/` → `./src/` (trailing slash in alias definition).

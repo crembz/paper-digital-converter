@@ -1,0 +1,12 @@
+#!/usr/bin/env node
+'use strict';
+
+try {
+  require('../dist-cli/cli').main();
+} catch (err) {
+  if (err && typeof err === 'object' && 'code' in err && err.code === 'MODULE_NOT_FOUND') {
+    console.error('Error: CLI not built. Run: npm run build-cli');
+    process.exit(1);
+  }
+  throw err;
+}

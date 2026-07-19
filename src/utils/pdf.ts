@@ -11,9 +11,37 @@ const pdfjsLogger = {
 };
 (pdfjsLib.GlobalWorkerOptions as unknown as Record<string, unknown>).logger = pdfjsLogger;
 
+function compressImage(canvas: HTMLCanvasElement, quality: number): string {
+  const dataUri = canvas.toDataURL('image/jpeg', quality);
+  return dataUri;
+}
+
+async function resizeIfNeeded(dataUri: string, maxWidth: number): Promise<string> {
+  const img = new Image();
+  const promise = new Promise<string>((resolve) => {
+    img.onload = () => {
+      if (img.width <= maxWidth && img.height <= maxWidth) {
+        resolve(dataUri);
+        return;
+      }
+      const canvas = document.createElement('canvas');
+      const scale = Math.min(maxWidth / img.width, maxWidth / img.height);
+      canvas.width = Math.round(img.width * scale);
+      canvas.height = Math.round(img.height * scale);
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      }
+      resolve(compressImage(canvas, 0.75));
+    };
+    img.src = dataUri;
+  });
+  return promise;
+}
+
 async function renderPageToDataUri(pdf: pdfjsLib.PDFDocumentProxy, pageNum: number): Promise<string> {
   const page = await pdf.getPage(pageNum);
-  const viewport = page.getViewport({ scale: 3 });
+  const viewport = page.getViewport({ scale: 2 });
 
   const canvas = document.createElement('canvas');
   canvas.width = viewport.width;
@@ -24,7 +52,9 @@ async function renderPageToDataUri(pdf: pdfjsLib.PDFDocumentProxy, pageNum: numb
 
   await page.render({ canvasContext: ctx, viewport }).promise;
 
-  return canvas.toDataURL('image/png');
+  let dataUri = compressImage(canvas, 0.75);
+
+  return resizeIfNeeded(dataUri, 2048);
 }
 
 export async function renderPdfPages(file: File): Promise<string[]> {

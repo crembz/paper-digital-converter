@@ -121,15 +121,36 @@ Default config (OpenAI provider)
 
 ```
 App (state orchestrator)
-├── TopBar (title, Settings btn, window controls)
-├── MainPanel
-│   ├── ImageUploader (dropzone, file picker)  ← initial state
-│   ├── ImageUploader (during PDF loading)      ← loading state
-│   └── ImagePreview (image display, nav, zoom) ← loaded state
-├── StatusBar (status text, action buttons)
-└── ConfigPanel (modal, LLM config form + output folder)   ← when showConfig
-    └── ConflictDialog (modal, file conflict)    ← when showConflictDialog
+├── container (root wrapper)
+│   ├── top-bar (title, Settings btn, window controls)
+│   ├── main-panel
+│   │   └── main-panel__split (during conversion)
+│   │       ├── ImageUploader (dropzone, file picker)  ← initial state
+│   │       ├── ImageUploader (during PDF loading)      ← loading state
+│   │       ├── ImagePreview (image display, nav, zoom) ← loaded state
+│   │       ├── batch-view (batch file list)
+│   │       │   └── batch-file (per-file item)
+│   │       └── LiveOutputPanel (real-time output during conversion)
+│   │           └── textarea (read-only output)
+│   └── StatusBar (status text, action buttons)
+├── ConfigPanel (modal, LLM config form + output folder)   ← when showConfig
+│   └── ConflictDialog (modal, file conflict)    ← when showConflictDialog
+└── overlay (backdrop)
 ```
+
+### Component Details
+
+| Component | Location | Purpose |
+|---|---|---|
+| `App` | `src/App.tsx` | State orchestrator, conversion flow, conflict handling |
+| `TopBar` | `src/App.tsx` (inline) | Title, Settings button, custom window controls |
+| `ImageUploader` | `src/components/ImageUploader.tsx` | Drag-drop zone, file picker, PDF loading indicator |
+| `ImagePreview` | `src/components/ImagePreview.tsx` | Image display, page navigation, zoom controls |
+| `LiveOutputPanel` | `src/components/LiveOutputPanel.tsx` | Real-time streaming output during conversion, copy button |
+| `StatusBar` | `src/components/StatusBar.tsx` | Status text, Convert/Abort/Open Folder buttons |
+| `ConfigPanel` | `src/components/ConfigPanel.tsx` | Modal LLM config form with provider, model, API key, base URL |
+| `MarkdownEditor` | `src/components/MarkdownEditor.tsx` | Editable markdown with live preview (not used in current flow) |
+| `ConflictDialog` | `src/App.tsx` (inline) | File conflict resolution: skip, overwrite, rename |
 
 ## LLM Provider Matrix
 
@@ -139,7 +160,7 @@ App (state orchestrator)
 | Anthropic | `@anthropic-ai/sdk` | Yes (stream API) | `https://api.anthropic.com` | Yes |
 | OpenAI-Compatible | `openai` npm package | Yes (streaming API) | (user-provided) | Yes |
 | LM Studio | `openai` npm package | Yes (streaming API) | `http://localhost:1234/v1` | No (optional) |
-| Gemini | REST `fetch()` | No (non-streaming) | `https://generativelanguage.googleapis.com` | Yes |
+| Gemini | REST `fetch()` with `ReadableStream` | Yes (SSE-like JSON lines) | `https://generativelanguage.googleapis.com` | Yes |
 | Ollama | REST `fetch()` | No (non-streaming) | `http://localhost:11434` | No |
 
 ### Model Fetch API Formats
@@ -149,7 +170,7 @@ Each provider returns model data in a different format:
 - **OpenAI / OpenAI-Compatible / LM Studio**: `GET /v1/models` → `{ data: [{ id, ... }] }`
 - **LM Studio (fallback)**: Single object `{ id, ... }` (not wrapped in array)
 - **Anthropic**: `GET /v1/messages/models` → `{ models: [{ name, ... }] }`
-- **Gemini**: `GET /v1beta/models` → `{ models: [{ name, supportedGenerationMethods }] }` — filters for `generateContent` support
+- **Gemini**: `GET /v1beta/models` → `{ models: [{ name, supportedGenerationMethods }] }` — filters for `generateContent` support; conversion uses `POST /v1beta/models/{model}:streamGenerateContent` for streaming
 - **Ollama**: `GET /api/tags` → `{ models: [{ name, ... }] }`
 
 ### URL Handling Gotcha

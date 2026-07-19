@@ -1,6 +1,6 @@
 import OpenAI from 'openai';
 import Anthropic from '@anthropic-ai/sdk';
-import { AppConfig } from './config';
+import { AppConfig } from '../types';
 import { OCR_SYSTEM_PROMPT } from '../utils/prompt';
 
 function extractMediaType(dataUri: string): string {
@@ -161,7 +161,7 @@ async function convertWithGemini(
   apiKey: string,
   model: string,
   imageBase64: string,
-  _onChunk: (text: string) => void,
+  onChunk: (text: string) => void,
   signal: AbortSignal,
 ): Promise<string> {
   const mediaType = extractMediaType(imageBase64);
@@ -169,7 +169,7 @@ async function convertWithGemini(
 
   const fullModelName = model.startsWith('models/') ? model : `models/${model}`;
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/${fullModelName}:generateContent`;
+  const url = `https://generativelanguage.googleapis.com/v1beta/${fullModelName}:streamGenerateContent`;
 
   const body = {
     contents: [
@@ -196,9 +196,47 @@ async function convertWithGemini(
     throw new Error(`Gemini API error (${res.status}): ${text}`);
   }
 
-  const data = await res.json();
-  const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-  return text || '';
+  const reader = res.body?.getReader();
+  if (!reader) {
+    const data = await res.json();
+    return data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+  }
+
+  const decoder = new TextDecoder();
+  let fullText = '';
+  let buffer = '';
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed) continue;
+        try {
+          const parsed = JSON.parse(trimmed);
+          const chunks = parsed?.candidates?.[0]?.content?.parts || [];
+          for (const part of chunks) {
+            if (part?.text) {
+              fullText += part.text;
+              onChunk(part.text);
+            }
+          }
+        } catch {
+          // Skip unparseable chunks
+        }
+      }
+    }
+  } finally {
+    reader.releaseLock();
+  }
+
+  return fullText;
 }
 
 export async function fetchAvailableModels(

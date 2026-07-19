@@ -89,7 +89,7 @@ export async function loadConfig(): Promise<AppConfig | null> {
   }
 
   try {
-    if (typeof window.electronAPI === 'undefined') return null;
+    if (typeof window === 'undefined' || typeof window.electronAPI === 'undefined') return null;
     const fileConfig = await window.electronAPI.loadConfig();
 
     if (fileConfig && fileConfig.provider) {
@@ -113,7 +113,7 @@ export async function loadConfig(): Promise<AppConfig | null> {
 }
 
 export async function saveConfig(config: AppConfig): Promise<void> {
-  if (typeof window.electronAPI === 'undefined') return;
+  if (typeof window === 'undefined' || typeof window.electronAPI === 'undefined') return;
   await window.electronAPI.saveConfig(config);
 }
 

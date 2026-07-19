@@ -77,10 +77,10 @@ Create a `.env` file (see `.env.example`):
 
 ### Naming
 
-- Components: PascalCase (`ConfigPanel.tsx`, `ImageUploader.tsx`)
-- Services: camelCase (`loadConfig`, `convertImageToMarkdown`)
-- Utilities: camelCase (`renderPdfPages`, `generateFilenameFromMarkdown`)
-- CSS classes: kebab-case (`image-preview__toolbar`)
+- Components: PascalCase (`ConfigPanel.tsx`, `ImageUploader.tsx`, `LiveOutputPanel.tsx`)
+- Services: camelCase (`loadConfig`, `convertImageToMarkdown`, `renderPdfPages`)
+- Utilities: camelCase (`renderPdfPages`, `generateFilenameFromMarkdown`, `loadConfig`)
+- CSS classes: kebab-case (`image-preview__toolbar`, `live-output-panel__output`)
 - IPC channels: kebab-case (`load-config`, `open-file-dialog`)
 
 ## Adding a New LLM Provider
@@ -146,6 +146,26 @@ In `ConfigPanel.tsx` `validate()`, add any provider-specific field requirements 
 
 Update `docs/ARCHITECTURE.md` provider matrix and `README.md` feature list.
 
+## Component: LiveOutputPanel
+
+`src/components/LiveOutputPanel.tsx` displays real-time conversion output during processing:
+
+- Shows current file index (`File X/Y`) or "Converting" for single images
+- Shows current page progress (`Page X/Y`) when converting multi-page PDFs
+- Auto-scrolls to bottom as new content arrives
+- Copy button copies output to clipboard with "Copied!" feedback
+- Progress bar shows page completion percentage
+- Used only during `batchStatus === 'processing'` (split view with input)
+
+## Component: generateFilenameFromMarkdown
+
+`src/utils/filename.ts` exports `generateFilenameFromMarkdown(md: string): string`:
+
+1. Extracts first `# heading` as filename
+2. Falls back to first non-empty line
+3. Sanitizes: removes `\ / : * ? " < > |`, collapses whitespace to hyphens, lowercases, truncates to 100 chars
+4. Returns `'output'` as final fallback
+
 ## Config System Deep Dive
 
 ### Loading Order
@@ -188,7 +208,7 @@ Update `docs/ARCHITECTURE.md` provider matrix and `README.md` feature list.
 
 - **OpenAI-compatible providers**: Uses `client.chat.completions.create({ stream: true })` with `for await` iteration
 - **Anthropic**: Uses `client.messages.stream()` with `content_block_delta` event filtering
-- **Gemini**: Non-streaming `fetch()` — receives full response at once
+- **Gemini**: Streaming `fetch()` with `ReadableStream` reader — parses SSE-like JSON lines, extracts `candidates[0].content.parts[].text`
 
 ### Error Handling
 

@@ -6,6 +6,7 @@ import ImageUploader from './components/ImageUploader';
 import ImagePreview from './components/ImagePreview';
 import StatusBar from './components/StatusBar';
 import ConfigPanel from './components/ConfigPanel';
+import LiveOutputPanel from './components/LiveOutputPanel';
 
 export default function App() {
   const [config, setConfig] = useState<AppConfig | null>(null);
@@ -28,9 +29,21 @@ export default function App() {
   const [conflictStrategy, setConflictStrategy] = useState<'rename' | 'overwrite' | 'skip' | null>(null);
   const [existingFiles, setExistingFiles] = useState<string[]>([]);
   const [showConflictDialog, setShowConflictDialog] = useState(false);
+  const [liveOutput, setLiveOutput] = useState('');
+  const currentPartialRef = useRef('');
   const conflictStrategyRef = useRef(conflictStrategy);
   const existingFilesRef = useRef(existingFiles);
   const abortControllerRef = useRef<AbortController | null>(null);
+
+  const createStreamCallback = useCallback((totalPages: number) => {
+    return (chunk: string) => {
+      currentPartialRef.current += chunk;
+      setLiveOutput(prev => {
+        const separator = totalPages > 1 && prev.length > 0 ? '\n\n---\n\n' : '';
+        return prev + separator + currentPartialRef.current;
+      });
+    };
+  }, []);
 
   useEffect(() => {
     conflictStrategyRef.current = conflictStrategy;
@@ -114,6 +127,7 @@ export default function App() {
     setFilesConverted(0);
     setFilesSkipped(0);
     setFilesFailed(0);
+    setLiveOutput('');
     setConflictStrategy(null);
     setExistingFiles([]);
     setShowConflictDialog(false);
@@ -157,6 +171,7 @@ export default function App() {
     setFilesConverted(0);
     setFilesSkipped(0);
     setFilesFailed(0);
+    setLiveOutput('');
 
     try {
       if (batchFiles.length > 0) {
@@ -188,18 +203,24 @@ export default function App() {
 
               setConvertingPage({ current: p + 1, total: pages.length });
 
+              currentPartialRef.current = '';
+              const pageStreamCallback = createStreamCallback(pages.length);
+
               const pageResult = await convertImageToMarkdown(
                 config,
                 pages[p],
-                () => {},
+                pageStreamCallback,
                 abortController.signal,
               );
 
               fileResult += pageResult;
+              currentPartialRef.current = '';
 
               if (p < pages.length - 1) {
                 fileResult += '\n\n---\n\n';
               }
+
+              setLiveOutput(fileResult);
             }
 
             if (!abortController.signal.aborted && fileResult && outputFolder) {
@@ -242,18 +263,24 @@ export default function App() {
 
                 setConvertingPage({ current: i + 1, total: pages.length });
 
+                currentPartialRef.current = '';
+                const pageStreamCallback = createStreamCallback(pages.length);
+
                 const pageResult = await convertImageToMarkdown(
                   config,
                   pages[i],
-                  () => {},
+                  pageStreamCallback,
                   abortController.signal,
                 );
 
                 fullResult += pageResult;
+                currentPartialRef.current = '';
 
                 if (i < pages.length - 1) {
                   fullResult += '\n\n---\n\n';
                 }
+
+                setLiveOutput(fullResult);
               }
 
               if (!abortController.signal.aborted && fullResult) {
@@ -366,65 +393,141 @@ export default function App() {
       </div>
 
       <div className="main-panel">
-        {hasBatchFiles ? (
-          <div className="batch-view">
-            <div className="batch-view__header">
-              <span className="batch-view__count">
-                {batchFiles.filter(Boolean).length} files loaded
-              </span>
-              {!hasPages && !pdfLoading && (
-                <button
-                  className="btn-secondary batch-view__clear"
-                  onClick={handleRemoveImage}
-                >
-                  Clear
-                </button>
+        {batchStatus === 'processing' ? (
+          <div className="main-panel__split">
+            <div className="main-panel__content">
+              {hasBatchFiles ? (
+                <div className="batch-view">
+                  <div className="batch-view__header">
+                    <span className="batch-view__count">
+                      {batchFiles.filter(Boolean).length} files loaded
+                    </span>
+                    {!hasPages && !pdfLoading && (
+                      <button
+                        className="btn-secondary batch-view__clear"
+                        onClick={handleRemoveImage}
+                      >
+                        Clear
+                      </button>
+                    )}
+                  </div>
+                  <div className="batch-view__content">
+                    {batchFiles.map((file, index) => (
+                      <div
+                        key={index}
+                        className={`batch-file ${file ? 'batch-file--valid' : 'batch-file--error'} ${currentFileIndex === index ? 'batch-file--current' : ''}`}
+                        onClick={async () => {
+                          if (file) {
+                            setCurrentFileIndex(index);
+                            const pages = await loadPagesFromPath(file.filePath, file.fileType);
+                            setPages(pages);
+                            setCurrentPage(0);
+                          }
+                        }}
+                      >
+                        <span className="batch-file__name">{file?.filename ?? 'Failed to load'}</span>
+                        <span className="batch-file__pages">{file ? (file.fileType === 'pdf' ? 'PDF' : 'Image') : 'Failed'}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : !hasPages && !pdfLoading ? (
+                <ImageUploader
+                  onImageSelect={handleImageLoaded}
+                  onPdfSelect={handlePdfLoaded}
+                  onFilesSelected={handleFilesSelected}
+                  onLoadingState={setPdfLoading}
+                  onError={setError}
+                />
+              ) : pdfLoading ? (
+                <ImageUploader
+                  onImageSelect={handleImageLoaded}
+                  onPdfSelect={handlePdfLoaded}
+                  onFilesSelected={handleFilesSelected}
+                  onLoadingState={setPdfLoading}
+                  onError={setError}
+                />
+              ) : (
+                <ImagePreview
+                  image={currentImage!}
+                  onReplace={handleRemoveImage}
+                  totalPages={pages.length}
+                  currentPage={currentPage}
+                  onPageChange={setCurrentPage}
+                />
               )}
             </div>
-            <div className="batch-view__content">
-              {batchFiles.map((file, index) => (
-                <div
-                  key={index}
-                  className={`batch-file ${file ? 'batch-file--valid' : 'batch-file--error'} ${currentFileIndex === index ? 'batch-file--current' : ''}`}
-                  onClick={async () => {
-                    if (file) {
-                      setCurrentFileIndex(index);
-                      const pages = await loadPagesFromPath(file.filePath, file.fileType);
-                      setPages(pages);
-                      setCurrentPage(0);
-                    }
-                  }}
-                >
-                  <span className="batch-file__name">{file?.filename ?? 'Failed to load'}</span>
-                  <span className="batch-file__pages">{file ? (file.fileType === 'pdf' ? 'PDF' : 'Image') : 'Failed'}</span>
-                </div>
-              ))}
-            </div>
+            <LiveOutputPanel
+              currentFile={batchFiles[currentFileIndex]?.filename ?? (currentFilename ?? 'document')}
+              currentFileIndex={currentFileIndex}
+              totalFiles={batchFiles.filter(Boolean).length}
+              convertingPage={convertingPage}
+              output={liveOutput}
+            />
           </div>
-        ) : !hasPages && !pdfLoading ? (
-          <ImageUploader
-            onImageSelect={handleImageLoaded}
-            onPdfSelect={handlePdfLoaded}
-            onFilesSelected={handleFilesSelected}
-            onLoadingState={setPdfLoading}
-            onError={setError}
-          />
-        ) : pdfLoading ? (
-          <ImageUploader
-            onImageSelect={handleImageLoaded}
-            onPdfSelect={handlePdfLoaded}
-            onFilesSelected={handleFilesSelected}
-            onLoadingState={setPdfLoading}
-            onError={setError}
-          />
         ) : (
-          <ImagePreview
-            image={currentImage!}
-            onReplace={handleRemoveImage}
-            totalPages={pages.length}
-            currentPage={currentPage}
-            onPageChange={setCurrentPage}
-          />
+          <div className="main-panel__content">
+            {hasBatchFiles ? (
+              <div className="batch-view">
+                <div className="batch-view__header">
+                  <span className="batch-view__count">
+                    {batchFiles.filter(Boolean).length} files loaded
+                  </span>
+                  {!hasPages && !pdfLoading && (
+                    <button
+                      className="btn-secondary batch-view__clear"
+                      onClick={handleRemoveImage}
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+                <div className="batch-view__content">
+                  {batchFiles.map((file, index) => (
+                    <div
+                      key={index}
+                      className={`batch-file ${file ? 'batch-file--valid' : 'batch-file--error'} ${currentFileIndex === index ? 'batch-file--current' : ''}`}
+                      onClick={async () => {
+                        if (file) {
+                          setCurrentFileIndex(index);
+                          const pages = await loadPagesFromPath(file.filePath, file.fileType);
+                          setPages(pages);
+                          setCurrentPage(0);
+                        }
+                      }}
+                    >
+                      <span className="batch-file__name">{file?.filename ?? 'Failed to load'}</span>
+                      <span className="batch-file__pages">{file ? (file.fileType === 'pdf' ? 'PDF' : 'Image') : 'Failed'}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : !hasPages && !pdfLoading ? (
+              <ImageUploader
+                onImageSelect={handleImageLoaded}
+                onPdfSelect={handlePdfLoaded}
+                onFilesSelected={handleFilesSelected}
+                onLoadingState={setPdfLoading}
+                onError={setError}
+              />
+            ) : pdfLoading ? (
+              <ImageUploader
+                onImageSelect={handleImageLoaded}
+                onPdfSelect={handlePdfLoaded}
+                onFilesSelected={handleFilesSelected}
+                onLoadingState={setPdfLoading}
+                onError={setError}
+              />
+            ) : (
+              <ImagePreview
+                image={currentImage!}
+                onReplace={handleRemoveImage}
+                totalPages={pages.length}
+                currentPage={currentPage}
+                onPageChange={setCurrentPage}
+              />
+            )}
+          </div>
         )}
       </div>
 

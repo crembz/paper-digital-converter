@@ -10,7 +10,7 @@ Desktop app that converts paper notes (photos/PDFs) into digital markdown using 
 - Fetch available models from provider API
 - Manual model input as fallback
 - Conflict resolution when output files already exist (rename, overwrite, skip)
-- Real-time conversion progress tracking
+- Real-time streaming output during conversion
 - Editable markdown output
 - Dark theme UI
 
@@ -72,6 +72,59 @@ Override config by setting these in a `.env` file:
 | `VITE_LLM_MODEL` | Model name (e.g. `gpt-4o`, `claude-sonnet-4-20250514`) |
 | `VITE_LLM_API_KEY` | API key |
 | `VITE_LLM_BASE_URL` | Custom API base URL (for LM Studio, Ollama, or OpenAI-compatible providers) |
+
+## Command Line Interface
+
+Convert paper notes from the terminal:
+
+```bash
+# Build CLI first
+npm run build-cli
+
+# Convert a single file
+paper-converter --files notes.png --output ./output
+
+# Convert multiple files
+paper-converter --files img1.png img2.jpg scan.pdf --output ./markdown
+
+# Use a specific provider
+paper-converter --files page.png --output ./out --provider lmstudio --baseUrl http://localhost:1234/v1
+
+# Stream output to stdout
+paper-converter --files notes.png --output ./out --stream
+
+# Validate config without converting
+paper-converter --files notes.png --output ./out --dry-run
+```
+
+### Options
+
+| Option | Description |
+|---|---|
+| `--files <paths...>` | Input image/PDF files (required) |
+| `--output <dir>` | Output directory for markdown files (required) |
+| `--provider <name>` | LLM provider (`openai`, `anthropic`, `lmstudio`, `gemini`, `ollama`) |
+| `--model <name>` | Model name |
+| `--apiKey <key>` | API key |
+| `--baseUrl <url>` | API base URL |
+| `--stream` | Stream output to stdout |
+| `--dry-run` | Validate config without converting |
+
+### Configuration File
+
+Create `.paper-converter.json` in your working directory to persist settings:
+
+```json
+{
+  "provider": "lmstudio",
+  "model": "my-model",
+  "apiKey": "",
+  "baseUrl": "http://localhost:1234/v1",
+  "useApiKey": false
+}
+```
+
+CLI flags override the config file.
 
 ## Usage
 

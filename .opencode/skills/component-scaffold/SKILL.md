@@ -19,21 +19,21 @@ Every component must satisfy all items below:
 
 ### TypeScript
 5. Strict mode — zero `any` types
-6. All props typed; use `| null` or `| undefined` explicitly, never implicit
+6. All props typed; use `| null` or `| undefined` explicitly
 7. Event handlers typed with React event types (`React.ChangeEvent<HTMLInputElement>`, etc.)
-8. Callbacks wrapped in `useCallback` when passed to children or used in `useEffect` deps
 
 ### React Patterns
-9. Functional component only — no class components
-10. `useState` for local state, `useRef` for DOM refs, `useEffect` for side effects
-11. `useMemo` for expensive computations
-12. Clean up effects in teardown functions
+8. Functional component only — no class components
+9. `useState` for local state, `useRef` for DOM refs, `useEffect` for side effects
+10. `useMemo`/`useCallback` only when needed for performance or deps
+11. Clean up effects in teardown functions
 
 ### Styling
-13. BEM-like class names: `component-name__element--modifier`
-14. Dark theme compatible (bg: `#1a1a2e`, text: `#cdd6f4`, accents: `#89b4fa`, `#f38ba8`)
-15. Add corresponding CSS rules to `src/styles.css`
-16. No inline styles except for dynamic values (transforms, computed dimensions)
+12. BEM-like class names: `component-name__element--modifier`
+13. Use CSS custom properties from `:root` (see `src/styles.css`) — never hardcoded hex colors
+14. Add corresponding CSS rules to `src/styles.css`
+15. No inline styles except for dynamic values (transforms, computed dimensions)
+16. Every interactive element needs `:focus-visible` and `:disabled` states
 
 ### Accessibility
 17. Semantic HTML elements (`<button>`, `<label>`, `<nav>`)
@@ -46,40 +46,9 @@ Every component must satisfy all items below:
 22. Handle loading state (spinner, disabled buttons)
 23. Handle error state (error message, retry option)
 
-## Template
-
-```tsx
-import { useState, useCallback, useEffect } from 'react';
-
-interface ComponentNameProps {
-  // typed props
-  onAction?: (value: string) => void;
-  disabled?: boolean;
-}
-
-export default function ComponentName({
-  onAction,
-  disabled = false,
-}: ComponentNameProps) {
-  const [state, setState] = useState<string>('');
-
-  const handleAction = useCallback(() => {
-    if (onAction && state) {
-      onAction(state);
-    }
-  }, [onAction, state]);
-
-  return (
-    <div className="component-name">
-      {/* JSX with BEM classes, aria attributes */}
-    </div>
-  );
-}
-```
-
 ## After Creating
 
 1. Import and use in `App.tsx` (or parent component)
 2. Add CSS to `src/styles.css`
-3. Run `npx tsc --noEmit` to verify
+3. Verify with `npx tsc --noEmit`
 4. Test in dev mode

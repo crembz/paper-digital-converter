@@ -29,10 +29,12 @@ Electron + React desktop app. Converts paper notes to markdown via LLM vision mo
 - `src/services/llm.ts` — LLM client abstraction. Anthropic, OpenAI/openai-compatible, Gemini, and LM Studio paths. API key check uses `config.useApiKey` instead of provider-based check. `fetchAvailableModels` handles provider-specific model API formats (OpenAI array, LM Studio single object, Anthropic, Gemini, Ollama).
 - `src/services/config.ts` — Config loading with env → file → defaults cascade. Uses `import.meta.env.VITE_*` (not `process.env.*`). AppConfig includes `useApiKey` boolean and `outputFolder` string.
 - `src/utils/prompt.ts` — OCR system prompt template.
+- `src/utils/filename.ts` — `generateFilenameFromMarkdown()` extracts filename from markdown heading or first line.
 - `src/utils/pdf.ts` — PDF rendering via pdfjs-dist. Scale factor 3, uses `canvasContext` option, local worker import.
 - `src/main.tsx` — React entry point. Includes `Promise.try` polyfill for pdfjs-dist.
-- `src/App.tsx` — App state orchestrator. Manages conversion flow via `handleConvertWithFolder` (prompts for output folder if unset, checks file conflicts, shows conflict dialog). Uses `conflictStrategyRef`/`existingFilesRef` for stale closure prevention. `batchStatus` tracks conversion lifecycle (`idle` → `processing` → `done`/`error`).
-- `src/components/StatusBar.tsx` — Status text + action buttons. Convert button enabled when config exists and files are loaded. Shows "Open Output Folder" button when folder is set.
+- `src/App.tsx` — App state orchestrator. Manages conversion flow via `handleConvertWithFolder` (prompts for output folder if unset, checks file conflicts, shows conflict dialog). Uses `conflictStrategyRef`/`existingFilesRef` (not state) to avoid stale closures when called from the conflict dialog buttons. `batchStatus` tracks conversion lifecycle (`idle` → `processing` → `done`/`error`). `createStreamCallback` creates per-page streaming callbacks that append to `liveOutput` state.
+- `src/components/StatusBar.tsx` — Status text + action buttons. Convert button enabled when config exists and files are loaded. Shows "Open Output Folder" button when folder is set. Shows colored conversion summary (converted/skipped/failed) on done/error.
+- `src/components/LiveOutputPanel.tsx` — Real-time streaming output during conversion. Auto-scrolls, copy button, page progress bar. Used in split view during `batchStatus === 'processing'`.
 - `src/components/ConfigPanel.tsx` — LLM provider config form with provider selector, API key input, base URL input, manual model input, and "Fetch Models" button.
 - `src/components/ImageUploader.tsx` — Drag-and-drop image/PDF upload.
 - `src/components/ImagePreview.tsx` — Single-page image preview with page navigation.
@@ -56,38 +58,35 @@ Electron + React desktop app. Converts paper notes to markdown via LLM vision mo
 - **@anthropic-ai/sdk**: `^0.18.0`
 - **openai**: `^4.28.0`
 
-## Agent Delegation
+## Delegation
 
-You are the primary orchestrator. For any task falling within a subagent's domain, dispatch it via `Task` instead of editing owned files directly.
+You are the primary orchestrator. For tasks within a subagent's domain, dispatch via `Task` — do not edit owned files directly.
 
-### Ownership Table
+### Subagents (defined in `.opencode/agents/`)
 
-| Subagent | Owned files | Task types |
-|---|---|---|
-| `electron` | `electron/main.ts`, `electron/preload.ts`, Electron config | IPC handlers, window creation, dialogs, FS access, tray/menus, preload bridge types |
-| `frontend` | `src/components/*`, `src/App.tsx`, `src/main.tsx`, `src/styles.css`, `index.html` | React components, UI layout, state management, user interactions, CSS styling |
-| `infra` | `package.json`, `tsconfig*.json`, `vite.config.ts`, `.gitignore`, `.env.example`, `config.example.json`, `src/services/config.ts`, `electron-builder.yml`, `scripts/`, `public/` | Dependencies, build config, TypeScript, Vite, packaging, config loading/defaults, CI/CD, pdfjs-dist worker |
-| `llm` | `src/services/llm.ts`, `src/utils/prompt.ts` | LLM client abstraction, streaming, OCR prompts, provider logic, model selection |
+| Agent | Domain |
+|---|---|
+| `electron` | `electron/main.ts`, `electron/preload.ts`, Electron config, IPC handlers |
+| `frontend` | `src/components/*`, `src/App.tsx`, `src/main.tsx`, `src/styles.css`, `index.html` |
+| `infra` | `package.json`, `tsconfig*.json`, `vite.config.ts`, `.gitignore`, `src/services/config.ts`, `electron-builder.yml`, `scripts/`, `public/` |
+| `llm` | `src/services/llm.ts`, `src/utils/prompt.ts` |
 
 ### Skill Dispatch Matrix
 
-When a task matches a recurring shape, load the matching skill before dispatching the subagent:
+Load the matching skill before dispatching the subagent:
 
 | Task shape | Skill | Subagent(s) |
 |---|---|---|
 | New React component | `component-scaffold` | `frontend` |
-| New config field / setting | `config-extension` | `infra` (type, defaults, env) + `frontend` (UI form) |
+| New config field / setting | `config-extension` | `infra` + `frontend` |
 | Styling / CSS changes | `dark-theme` | `frontend` |
-| New LLM provider | `provider-integration` | `llm` (client impl) + `infra` (config defaults) + `frontend` (UI dropdown) |
+| New LLM provider | `provider-integration` | `llm` + `infra` + `frontend` |
 
 ### Scratch Files
 
-Every dispatched subagent must write its full findings and changes to a scratch file at `.opencode/tmp/<agent>-<task-slug>.md` before returning a summary. Read that file yourself for detail rather than relying on the summary alone.
+Subagents must write findings/changes to `.opencode/tmp/<agent>-<task-slug>.md` before returning. Read that file yourself for detail.
 
-### Recursion Guard
+### Rules
 
-The built-in `explore` and `general` agents must never dispatch further subagents. They use their own `Read`/`Grep`/`Glob` tools directly. This prevents unbounded recursion.
-
-### Self-Check
-
-Before any tool call, ask: does this file or task belong to one of the domain subagents? If yes, dispatch it via `Task` instead.
+- Built-in `explore` and `general` agents must never dispatch further subagents.
+- Before any tool call: does the file/task belong to a subagent's domain? If yes, dispatch via `Task`.

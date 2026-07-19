@@ -17,7 +17,33 @@ const ACCEPTED_TYPES: Record<string, string[]> = {
   'application/pdf': ['.pdf'],
 };
 
-function readFileAsDataUri(file: File): Promise<string> {
+function compressCanvas(canvas: HTMLCanvasElement, quality: number): string {
+  return canvas.toDataURL('image/jpeg', quality);
+}
+
+function resizeIfNeeded(dataUri: string, maxWidth: number): Promise<string> {
+  return new Promise<string>((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      if (img.width <= maxWidth && img.height <= maxWidth) {
+        resolve(dataUri);
+        return;
+      }
+      const canvas = document.createElement('canvas');
+      const scale = Math.min(maxWidth / img.width, maxWidth / img.height);
+      canvas.width = Math.round(img.width * scale);
+      canvas.height = Math.round(img.height * scale);
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      }
+      resolve(compressCanvas(canvas, 0.75));
+    };
+    img.src = dataUri;
+  });
+}
+
+async function readFileAsDataUri(file: File): Promise<string> {
   return new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => {
@@ -31,6 +57,13 @@ function readFileAsDataUri(file: File): Promise<string> {
     reader.onerror = () => reject(reader.error ?? new Error('File read error'));
     reader.readAsDataURL(file);
   });
+}
+
+async function processUploadedImage(file: File, dataUri: string): Promise<string> {
+  if (file.size > 2 * 1024 * 1024) {
+    return resizeIfNeeded(dataUri, 2048);
+  }
+  return dataUri;
 }
 
 export default function ImageUploader({ onImageSelect, onPdfSelect, onFilesSelected, onLoadingState, onError }: ImageUploaderProps) {
@@ -53,7 +86,8 @@ export default function ImageUploader({ onImageSelect, onPdfSelect, onFilesSelec
             onPdfSelect(pages, file.name);
           } else {
             const dataUri = await readFileAsDataUri(file);
-            onImageSelect(dataUri, file.name);
+            const processed = await processUploadedImage(file, dataUri);
+            onImageSelect(processed, file.name);
           }
         } catch (err: unknown) {
           const message = err instanceof Error ? err.message : 'Failed to process file';
